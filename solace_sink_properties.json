@@ -1,7 +1,7 @@
 {
 	"name": "solaceSinkConnector",
 	"config": {
-		"connector.class": "com.solace.sink.connector.SolaceSinkConnector",
+		"connector.class": "com.solace.sink.connector.SolaceSinkConnector", 
 		"tasks.max": "2",
 		"topics": "solacetest",
 		"sol.host": "160.101.136.33",

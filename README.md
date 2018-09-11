@@ -7,7 +7,7 @@ On the Solace side of the Sink Connector the adapter is using Solace's high perf
 that were used to send the messages to the Solace Broker. Solace supports transparent interoperability with many 
 message transports and languages/APIs. Therefore, from the single Solace Sink Connector any Kafka Topic (Key or not Keyed) Sink Record is instantly available for consumption by any consumer that uses one of the Solace supported open standards languages or transport protocols.
 
-Consider the following diagram:
+Consider the following diagram: 
 
 ![Architecture Overview](resources/SolaceAPI.png)
 
