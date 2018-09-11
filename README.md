@@ -5,8 +5,7 @@ This project provides a Solace/Kafka Sink Connector (adapter) that makes use of 
 
 On the Solace side of the Sink Connector the adapter is using Solace's high performance Java API to stream Solace messages to a Solace Broker (PubSub+ appliance, software or Solace Cloud service). Unlike many other message brokers, Solace supports transparent protocol and API messaging transformations. Therefore, any message that reaches the Solace broker is not limited to being consumed from the Solace broker only by Java clients using the same JCSMP libraries
 that were used to send the messages to the Solace Broker. Solace supports transparent interoperability with many 
-message transports and languages/APIs. Therefore, from the single Solace Sink Connector any Kafka Topic (Key or not Keyed) Sink Record consumed by 
-the Solace Sink Connector is suddenly available for consumption by any consumer that uses one of the Solace supported languages or transport protocols.
+message transports and languages/APIs. Therefore, from the single Solace Sink Connector any Kafka Topic (Key or not Keyed) Sink Record is instantly available for consumption by any consumer that uses one of the Solace supported open standards languages or transport protocols.
 
 Consider the following diagram:
 
@@ -128,9 +127,9 @@ For tuning, performance and scaling (multiple tasks is supported with this conne
 There is a bare minimum requirement to configure access to the Solace PubSub+ broker. A username, their password and VPN (Solace Virtual Private Network - a "virtual broker" used in Solace multi-tenancy configurations) and host reference are mandatory configuration details. An example of the required configuration file entries is as follows:
 
 ```ini
-sol.username=heinz1
-sol.password=heinz1
-sol.vpn_name=heinzvpn
+sol.username=user1
+sol.password=password1
+sol.vpn_name=kafkavpn
 sol.host=160.101.136.33
 ```
 
