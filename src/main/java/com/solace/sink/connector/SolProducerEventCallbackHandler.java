@@ -19,19 +19,21 @@
 
 package com.solace.sink.connector;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.solacesystems.jcsmp.JCSMPProducerEventHandler;
 import com.solacesystems.jcsmp.ProducerEventArgs;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 public class SolProducerEventCallbackHandler implements JCSMPProducerEventHandler {
-	private static final Logger log = LoggerFactory.getLogger(SolProducerEventCallbackHandler.class);
+  private static final Logger log = LoggerFactory.getLogger(SolProducerEventCallbackHandler.class);
 
-	@Override
-	public void handleEvent(ProducerEventArgs event) {
-		log.info("Received a message producer event: {} with the following info: {}", event.getEvent() , event.getInfo());
+  @Override
+  public void handleEvent(ProducerEventArgs event) {
+    log.info("Received a message producer event: {} with the following"
+        + " info: {}", event.getEvent(), event.getInfo());
 
-	}
+  }
 
 }

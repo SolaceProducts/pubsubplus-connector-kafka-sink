@@ -19,26 +19,30 @@
 
 package com.solace.sink.connector;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
 
-public class SolStreamingMessageCallbackHandler implements JCSMPStreamingPublishEventHandler{
-	private static final Logger log = LoggerFactory.getLogger(SolStreamingMessageCallbackHandler.class);
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-	@Override
-	public void handleError(String messageID, JCSMPException cause, long timestamp2) {
-		log.info("===========Error occurred for message: {}, with cause: {} details: {}", messageID, cause.getCause(), cause.getStackTrace()); 
-		cause.printStackTrace(); 
 
-	}
+public class SolStreamingMessageCallbackHandler implements JCSMPStreamingPublishEventHandler {
+  private static final Logger log = LoggerFactory
+      .getLogger(SolStreamingMessageCallbackHandler.class);
 
-	@Override
-	public void responseReceived(String messageID) {
-		log.trace("Received ACK for message with ID: {}", messageID);
+  @Override
+  public void handleError(String messageId, JCSMPException cause, long timestamp2) {
+    log.info("===========Error occurred for message: {}, with cause: {} "
+        + "details: {}", messageId, cause.getCause(),
+        cause.getStackTrace());
+    cause.printStackTrace();
 
-	}
+  }
+
+  @Override
+  public void responseReceived(String messageId) {
+    log.trace("Received ACK for message with ID: {}", messageId);
+
+  }
 
 }

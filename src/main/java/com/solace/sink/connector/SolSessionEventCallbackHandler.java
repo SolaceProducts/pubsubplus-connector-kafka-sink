@@ -19,27 +19,27 @@
 
 package com.solace.sink.connector;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.solacesystems.jcsmp.SessionEvent;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 
-public class SolSessionEventCallbackHandler implements SessionEventHandler{
-	final Logger log = LoggerFactory.getLogger(SolSessionEventCallbackHandler.class);
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-	@Override
-	public void handleEvent(SessionEventArgs event) {
 
-		log.info("Received Session Event {} with info {}\n", event.getEvent(), event.getInfo());
+public class SolSessionEventCallbackHandler implements SessionEventHandler {
+  final Logger log = LoggerFactory.getLogger(SolSessionEventCallbackHandler.class);
 
-		// Received event possibly due to DR fail-over complete
-		if(event.getEvent() == SessionEvent.VIRTUAL_ROUTER_NAME_CHANGED) {
-			log.info("Looks like DR fail-over may have just occured and has completed successfully");
-		}
+  @Override
+  public void handleEvent(SessionEventArgs event) {
 
-	}
+    log.info("Received Session Event {} with info {}\n", event.getEvent(), event.getInfo());
 
+    // Received event possibly due to DR fail-over complete
+    if (event.getEvent() == SessionEvent.VIRTUAL_ROUTER_NAME_CHANGED) {
+      log.info("Looks like DR fail-over may have just occured and has completed successfully");
+    }
+
+  }
 
 }

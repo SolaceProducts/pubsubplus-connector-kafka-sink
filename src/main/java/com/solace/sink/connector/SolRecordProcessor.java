@@ -19,12 +19,12 @@
 
 package com.solace.sink.connector;
 
-import org.apache.kafka.connect.sink.SinkRecord;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
+
+import org.apache.kafka.connect.sink.SinkRecord;
 
 public interface SolRecordProcessor {
 
-	BytesXMLMessage processRecord(String sKey, SinkRecord record);
+  BytesXMLMessage processRecord(String skey, SinkRecord record);
 
 }

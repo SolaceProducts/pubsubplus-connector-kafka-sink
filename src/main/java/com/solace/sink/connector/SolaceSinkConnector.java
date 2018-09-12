@@ -32,50 +32,49 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SolaceSinkConnector extends SinkConnector {
-	private static final Logger log = LoggerFactory.getLogger(SolaceSinkConnector.class);
+  private static final Logger log = LoggerFactory.getLogger(SolaceSinkConnector.class);
 
-	SolaceSinkConfig sConfig;
-	private Map<String, String> sConfigProperties;
+  SolaceSinkConfig sconfig;
+  private Map<String, String> sconfigProperties;
 
-	@Override
-	public String version() {
-		return VersionUtil.getVersion();
-	}
+  @Override
+  public String version() {
+    return VersionUtil.getVersion();
+  }
 
-	@Override
-	public void start(Map<String, String> props) {
-		log.info("==================== Start a SolaceSinkConnector");
-		sConfigProperties = props;
-		sConfig = new SolaceSinkConfig(props);
-	}
+  @Override
+  public void start(Map<String, String> props) {
+    log.info("==================== Start a SolaceSinkConnector");
+    sconfigProperties = props;
+    sconfig = new SolaceSinkConfig(props);
+  }
 
-	@Override
-	public Class<? extends Task> taskClass() {
-		log.info("==================== Requesting SolaceSinkTask");
-		return SolaceSinkTask.class;
-	}
+  @Override
+  public Class<? extends Task> taskClass() {
+    log.info("==================== Requesting SolaceSinkTask");
+    return SolaceSinkTask.class;
+  }
 
-	@Override
-	public List<Map<String, String>> taskConfigs(int maxTasks) {
-		log.info("==================== Requesting taskConfigs for SolaceSinkTask");
-		List<Map<String, String>> taskConfigs = new ArrayList<>(maxTasks);
-		Map<String, String> taskProps = new HashMap<>(sConfigProperties);
-		for (int i = 0; i < maxTasks; i++)
-		{
-			taskConfigs.add(taskProps);
-		}
-		return taskConfigs;
-	}
+  @Override
+  public List<Map<String, String>> taskConfigs(int maxTasks) {
+    log.info("==================== Requesting taskConfigs for SolaceSinkTask");
+    List<Map<String, String>> taskConfigs = new ArrayList<>(maxTasks);
+    Map<String, String> taskProps = new HashMap<>(sconfigProperties);
+    for (int i = 0; i < maxTasks; i++) {
+      taskConfigs.add(taskProps);
+    }
+    return taskConfigs;
+  }
 
-	@Override
-	public void stop() {
-		log.info("SolaceSourceConnector is shutting down");
-	}
+  @Override
+  public void stop() {
+    log.info("SolaceSourceConnector is shutting down");
+  }
 
-	@Override
-	public ConfigDef config() {
-		log.info("==================== Requesting Config for  SolaceSinkConnector");
-		return SolaceSinkConfig.config;
-	}
+  @Override
+  public ConfigDef config() {
+    log.info("==================== Requesting Config for  SolaceSinkConnector");
+    return SolaceSinkConfig.config;
+  }
 
 }

@@ -19,6 +19,17 @@
 
 package com.solace.sink.connector;
 
+import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.DeliveryMode;
+import com.solacesystems.jcsmp.JCSMPException;
+import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.JCSMPSession;
+import com.solacesystems.jcsmp.ProducerFlowProperties;
+import com.solacesystems.jcsmp.Queue;
+import com.solacesystems.jcsmp.Topic;
+import com.solacesystems.jcsmp.XMLMessageProducer;
+import com.solacesystems.jcsmp.transaction.TransactedSession;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,161 +42,188 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.solacesystems.jcsmp.BytesXMLMessage;
-import com.solacesystems.jcsmp.DeliveryMode;
-import com.solacesystems.jcsmp.JCSMPException;
-import com.solacesystems.jcsmp.JCSMPFactory;
-import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.ProducerFlowProperties;
-import com.solacesystems.jcsmp.Queue;
-import com.solacesystems.jcsmp.Topic;
-import com.solacesystems.jcsmp.XMLMessageProducer;
-import com.solacesystems.jcsmp.transaction.TransactedSession;
-
 public class SolaceSinkSender {
-	private static final Logger log = LoggerFactory.getLogger(SolaceSinkSender.class);
+  private static final Logger log = LoggerFactory.getLogger(SolaceSinkSender.class);
 
-	private SolaceSinkConfig sConfig;
-	private XMLMessageProducer producer;
-	private XMLMessageProducer TxProducer;
-	private BytesXMLMessage message;
-	private List<Topic> Topics = new ArrayList<Topic>();
-	private Queue solQueue;
-	private boolean useTxforQueue = false;
-	private Class<?> cProcessor;
-	private SolRecordProcessor processor;
-	private String kafkaKey;
-	private TransactedSession TxSession;
-	private SolaceSinkTask sinkTask;
-	private AtomicInteger msgCounter = new AtomicInteger();
-	private Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<TopicPartition, OffsetAndMetadata>();
+  private SolaceSinkConfig sconfig;
+  private XMLMessageProducer producer;
+  private XMLMessageProducer txProducer;
+  private BytesXMLMessage message;
+  private List<Topic> topics = new ArrayList<Topic>();
+  private Queue solQueue;
+  private boolean useTxforQueue = false;
+  private Class<?> cprocessor;
+  private SolRecordProcessor processor;
+  private String kafkaKey;
+  private TransactedSession txSession;
+  private SolaceSinkTask sinkTask;
+  private AtomicInteger msgCounter = new AtomicInteger();
+  private Map<TopicPartition, OffsetAndMetadata> offsets 
+      = new HashMap<TopicPartition, OffsetAndMetadata>();
 
-	public SolaceSinkSender(SolaceSinkConfig sConfig, JCSMPSession session, TransactedSession TxSession, SolaceSinkTask sinkTask) {
-		this.sConfig = sConfig;
-		this.TxSession = TxSession;
-		this.sinkTask = sinkTask;
+  /**
+   * Class that sends Solace Messages from Kafka Records.
+   * @param sconfig JCSMP Configuration
+   * @param session JCSMPSession
+   * @param txSession TransactedSession
+   * @param sinkTask Connector Sink Task
+   */
+  public SolaceSinkSender(SolaceSinkConfig sconfig, JCSMPSession session, 
+      TransactedSession txSession, SolaceSinkTask sinkTask) {
+    this.sconfig = sconfig;
+    this.txSession = txSession;
+    this.sinkTask = sinkTask;
 
-		kafkaKey = this.sConfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
-		
-		if(sConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) 
-			solQueue = JCSMPFactory.onlyInstance().createQueue(sConfig.getString(SolaceSinkConstants.SOl_QUEUE));
+    kafkaKey = this.sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
 
-		ProducerFlowProperties flowProps = new ProducerFlowProperties();
-		flowProps.setAckEventMode(sConfig.getString(SolaceSinkConstants.SOL_ACK_EVENT_MODE));
-		flowProps.setWindowSize(sConfig.getInt(SolaceSinkConstants.SOL_PUBLISHER_WINDOW_SIZE));
+    if (sconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
+      solQueue = JCSMPFactory.onlyInstance().createQueue(
+          sconfig.getString(SolaceSinkConstants.SOl_QUEUE));
+    }
 
+    ProducerFlowProperties flowProps = new ProducerFlowProperties();
+    flowProps.setAckEventMode(sconfig.getString(SolaceSinkConstants.SOL_ACK_EVENT_MODE));
+    flowProps.setWindowSize(sconfig.getInt(SolaceSinkConstants.SOL_PUBLISHER_WINDOW_SIZE));
 
+    try {
+      producer = session.getMessageProducer(new SolStreamingMessageCallbackHandler());
+      if (sconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
+        txProducer = txSession.createProducer(flowProps, new SolStreamingMessageCallbackHandler(),
+            new SolProducerEventCallbackHandler());
+        log.info("=================txSession status: {}", txSession.getStatus().toString());
+      }
 
-		try {
-			producer = session.getMessageProducer(new SolStreamingMessageCallbackHandler());
-			if(sConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
-				TxProducer = TxSession.createProducer(flowProps, new SolStreamingMessageCallbackHandler(), new SolProducerEventCallbackHandler());
-				log.info("=================TxSession status: {}", TxSession.getStatus().toString());
-			}
+    } catch (JCSMPException e) {
+      log.info("Received Solace exception {}, with the following: {} ", 
+          e.getCause(), e.getStackTrace());
+    }
 
-		} catch (JCSMPException e) {
-			log.info("Received Solace exception {}, with the following: {} ", e.getCause(), e.getStackTrace());
-		}
+    cprocessor = (this.sconfig.getClass(SolaceSinkConstants.SOL_RECORD_PROCESSOR));
+    try {
+      processor = (SolRecordProcessor) cprocessor.newInstance();
+    } catch (InstantiationException | IllegalAccessException e) {
+      log.info("=================Received exception while creating record processing class {}, "
+          + "with the following: {} ",
+          e.getCause(), e.getStackTrace());
+    }
+  }
 
+  /**
+   * Generate Solace topics from topic string.
+   */
+  public void createTopics() {
+    String solaceTopics = sconfig.getString(SolaceSinkConstants.SOL_TOPICS);
+    String[] stopics = solaceTopics.split(",");
+    int counter = 0;
 
-		cProcessor = (this.sConfig.getClass(SolaceSinkConstants.SOL_RECORD_PROCESSOR));
-		try {
-			processor = (SolRecordProcessor) cProcessor.newInstance();
-		} catch (InstantiationException | IllegalAccessException e) {
-			log.info("=================Received exception while creating record processing class {}, with the following: {} ", e.getCause(), e.getStackTrace());
-		}
-	}
+    while (stopics.length > counter) {
+      topics.add(JCSMPFactory.onlyInstance().createTopic(stopics[counter].trim()));
+      counter++;
+    }
+  }
 
-	public void createTopics() {
-		String solaceTopics = sConfig.getString(SolaceSinkConstants.SOL_TOPICS);
-		String sTopics[] = solaceTopics.split(",");
-		int counter = 0;
+  public void useTx(boolean tx) {
+    this.useTxforQueue = tx;
+  }
 
-		while(sTopics.length > counter) {
-			Topics.add(JCSMPFactory.onlyInstance().createTopic(sTopics[counter].trim()));
-			counter++;
-		}
-	}
+  /**
+   * Send Solace Message from Kafka Record.
+   * @param record Kakfa Records
+   */
+  public void sendRecord(SinkRecord record) {
+    message = processor.processRecord(kafkaKey, record);
+    offsets.put(new TopicPartition(record.topic(), record.kafkaPartition()),
+        new OffsetAndMetadata(record.kafkaOffset()));
+    log.trace("=================record details, topic: {}, Partition: {}, "
+        + "Offset: {}", record.topic(),
+        record.kafkaPartition(), record.kafkaOffset());
 
-	public void useTx(boolean Tx) {
-		this.useTxforQueue = Tx;
-	}
+    if (message.getAttachmentContentLength() == 0 || message.getAttachmentByteBuffer() == null) {
+      log.info("==============Received record that had no data....discarded");
+      return;
+    }
 
-	public void sendRecord(SinkRecord record) {
-		message = processor.processRecord(kafkaKey, record);
-		offsets.put(new TopicPartition(record.topic(), record.kafkaPartition()), new OffsetAndMetadata(record.kafkaOffset()));
-		log.trace("=================record details, topic: {}, Partition: {}, Offset: {}", record.topic(), record.kafkaPartition(), record.kafkaOffset());
+    if (message.getUserData() == null) {
+      log.trace("============Receive a Kafka record with no data ... discarded");
+      return;
+    }
 
+    if (useTxforQueue) {
+      try {
+        message.setDeliveryMode(DeliveryMode.PERSISTENT);
+        txProducer.send(message, solQueue);
+        msgCounter.getAndIncrement();
+        log.trace("===============Count of TX message is now: {}", msgCounter.get());
+      } catch (JCSMPException e) {
+        log.info("=================Received exception while sending message to queue {}:  "
+            + "{}, with the following: {} ",
+            solQueue.getName(), e.getCause(), e.getStackTrace());
+      }
 
-		if(message.getAttachmentContentLength() == 0 || message.getAttachmentByteBuffer() == null) {
-			log.info("==============Received record that had no data....discarded");
-			return;
-		}
+    }
 
-		if(message.getUserData() == null) {
-			log.trace("============Receive a Kafka record with no data ... discarded");
-			return;
-		} 
+    if (topics.size() != 0 && message.getDestination() == null) {
+      message.setDeliveryMode(DeliveryMode.DIRECT);
+      int count = 0;
+      while (topics.size() > count) {
+        try {
+          producer.send(message, topics.get(count));
+          count++;
+        } catch (JCSMPException e) {
+          log.trace(
+              "=================Received exception while sending message to topic {}:  "
+              + "{}, with the following: {} ",
+              topics.get(count).getName(), e.getCause(), e.getStackTrace());
 
-		if(useTxforQueue) {
-			try {
-				message.setDeliveryMode(DeliveryMode.PERSISTENT);
-				TxProducer.send(message , solQueue);
-				msgCounter.getAndIncrement();
-				log.trace("===============Count of TX message is now: {}", msgCounter.get());
-			} catch (JCSMPException e) {
-				log.info("=================Received exception while sending message to queue {}:  {}, with the following: {} ", solQueue.getName(), e.getCause(), e.getStackTrace());
-			} 
+        }
+        count++;
+      }
 
-		} 
+    }
+    // Solace limits transaction size to 255 messages so need to force commit
+    if (useTxforQueue && msgCounter.get() > 200) {
+      log.debug("================Manually Flushing Offsets");
+      sinkTask.flush(offsets);
+    }
 
-		if( Topics.size() != 0 && message.getDestination() == null ) {
-			message.setDeliveryMode(DeliveryMode.DIRECT);
-			int count = 0;
-			while(Topics.size() > count) {
-				try {
-					producer.send(message, Topics.get(count));
-					count++;
-				} catch (JCSMPException e) {
-					log.trace("=================Received exception while sending message to topic {}:  {}, with the following: {} ", Topics.get(count).getName(), e.getCause(), e.getStackTrace());
+  }
+  
+  /**
+   * Commit Solace and Kafka records.
+   * @return Boolean Status
+   */
+  public synchronized boolean commit() {
+    boolean commited = true;
+    try {
+      if (useTxforQueue) {
+        txSession.commit();
+        commited = true;
+        msgCounter.set(0);
+        log.debug("Comitted Solace records for transaction with status: {}", 
+            txSession.getStatus().name());
+      }
+    } catch (JCSMPException e) {
+      log.info("Received Solace exception {}, with the following: {} ", 
+          e.getCause(), e.getStackTrace());
+      commited = false;
+    }
+    return commited;
+  }
 
-				}
-				count++;
-			}
+  /**
+   * Shutdown TXProducer and Topic Producer.
+   * @return Boolean of Shutdown Status
+   */
+  public boolean shutdown() {
+    boolean success = true;
+    if (txProducer != null) {
+      txProducer.close();
+    }
+    if (producer != null) {
+      producer.close();
+    }
 
-		}
-		// Solace limits transaction size to 255 messages so need to force commit
-		if(useTxforQueue && msgCounter.get() > 200) {
-			log.debug("================Manually Flushing Offsets");
-			sinkTask.flush(offsets);
-		}
-
-	}
-
-	public synchronized boolean commit() {
-		boolean commited = true;
-		try {
-			if (useTxforQueue) {
-				TxSession.commit();
-				commited = true;
-				msgCounter.set(0);
-				log.debug("Comitted Solace records for transaction with status: {}", TxSession.getStatus().name());
-			}
-		} catch (JCSMPException e) {
-			log.info("Received Solace exception {}, with the following: {} ", e.getCause(), e.getStackTrace());
-			commited = false;
-		}
-		return commited;
-	}
-
-	public boolean shutdown() {
-		boolean success = true;
-		if(TxProducer != null)
-			TxProducer.close();
-		if(producer !=null)
-			producer.close();
-
-		return success;
-	}
+    return success;
+  }
 
 }
