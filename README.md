@@ -159,7 +159,7 @@ The processing of the Kafka Source Record to create a Solace message is handled 
 The desired message processor is loaded at runtime based on the configuration of the JSON or properties configuration file, for example:
 
 ```ini
-sol.record_processor_class=com.solace.sink.connector.recordProcessor.SolSimpleKeyedRecordProcessor
+sol.record_processor_class=com.solace.sink.connector.recordprocessor.SolSimpleKeyedRecordProcessor
 ```
 
 It is possible to create more custom Record Processors based on your Kafka record requirements for keying and/or value serialization and the desired format of the Solace event message. Simply add the new record processor classes to the project. The desired record processor is installed at run time based on the configuration file. 
