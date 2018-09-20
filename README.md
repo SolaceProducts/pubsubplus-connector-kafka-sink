@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/SolaceLabs/solace-kafka-connector-sink.svg?branch=development)](https://travis-ci.org/SolaceLabs/solace-kafka-connector)
+
 # Solace Sink Kafka Connector v1.0
 ## Synopsis
 
