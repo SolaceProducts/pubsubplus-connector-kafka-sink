@@ -1,5 +1,8 @@
 language: java
-sudo: false
+install: true
 
-./gradlew clean check jar
+jdk:
+  - oraclejdk8
 
+script:
+  - ./gradlew clean check jar
