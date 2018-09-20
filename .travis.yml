@@ -2,3 +2,4 @@ language: java
 sudo: false
 
 ./gradlew clean check jar
+
