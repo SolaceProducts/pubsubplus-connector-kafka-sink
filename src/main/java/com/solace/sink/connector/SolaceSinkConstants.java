@@ -130,5 +130,9 @@ public class SolaceSinkConstants {
   // Allowable values for the test sample include: NONE, DESTINATION,
   // CORRELATION_ID, CORRELATION_ID_AS_BYTES
   public static final String SOL_KAFKA_MESSAGE_KEY = "sol.kafka_message_key";
+  
+  // Low importance, offset for replay - if null, continue from last offset when was last stopped
+  // value of 0 is start from beginning
+  public static final String SOL_KAFKA_REPLAY_OFFSET = "sol.kakfa_replay_offset";
 
 }

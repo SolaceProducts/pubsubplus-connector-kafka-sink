@@ -60,8 +60,11 @@ public class SolSimpleKeyedRecordProcessorDto implements SolRecordProcessor {
     Object vk = record.key();
     String kafkaTopic = record.topic();
 
-    msg.setUserData(kafkaTopic.getBytes(StandardCharsets.UTF_8)); // add the original Kafka Topic
-    //to the binary user data
+    // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
+    String userData = "T:" + record.topic() + ",P:" 
+        + record.kafkaPartition() + ",O:" + record.kafkaOffset();
+    msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
+
     msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
     msg.setDeliverToOne(true); // Added DTO flag for topic consumer scaling
 

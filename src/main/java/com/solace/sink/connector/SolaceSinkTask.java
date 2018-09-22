@@ -26,13 +26,15 @@ import com.solacesystems.jcsmp.transaction.TransactedSession;
 
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
-
+import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +45,7 @@ public class SolaceSinkTask extends SinkTask {
   private JCSMPSession session;
   private SolaceSinkSender sender;
   private boolean txEnabled = false;
+  private SinkTaskContext context;
 
   SolaceSinkConfig sconfig;
 
@@ -53,7 +56,7 @@ public class SolaceSinkTask extends SinkTask {
 
   @Override
   public void start(Map<String, String> props) {
-    sconfig = new SolaceSinkConfig(props);
+    sconfig = new SolaceSinkConfig(props);  
 
     sessionRef = new SolSessionCreate(sconfig);
     sessionRef.configureSession();
@@ -79,8 +82,9 @@ public class SolaceSinkTask extends SinkTask {
   @Override
   public void put(Collection<SinkRecord> records) {
     for (SinkRecord r : records) {
-      log.trace("Putting record to topic {}, partition {} and offset {}", 
-          r.topic(), r.kafkaPartition(), r.kafkaOffset());
+      log.trace("Putting record to topic {}, partition {} and offset {}", r.topic(), 
+          r.kafkaPartition(),
+          r.kafkaOffset());
       sender.sendRecord(r);
     }
 
@@ -122,8 +126,8 @@ public class SolaceSinkTask extends SinkTask {
     for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : currentOffsets.entrySet()) {
       TopicPartition tp = entry.getKey();
       OffsetAndMetadata om = entry.getValue();
-      log.debug("Flushing up to topic {}, partition {} and offset {}", 
-          tp.topic(), tp.partition(), om.offset());
+      log.debug("Flushing up to topic {}, partition {} and offset {}", tp.topic(), 
+          tp.partition(), om.offset());
     }
 
     if (sconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
@@ -134,6 +138,34 @@ public class SolaceSinkTask extends SinkTask {
       }
     }
 
+  }
+
+  /**
+   * Create reference for SinkTaskContext - required for replay.
+   * 
+   * @param context SinkTaskContext
+   */
+  public void initialize(SinkTaskContext context) {
+    this.context = context;
+  }
+
+  /**
+   * Opens access to partition write, this populates SinkTask Context
+   * which allows setting of offset from which to start reading. 
+   * 
+   * @param partitions List of TopicPartitions for Topic
+   */
+  public void open(Collection<TopicPartition> partitions) {
+    Long offsetLong = sconfig.getLong(SolaceSinkConstants.SOL_KAFKA_REPLAY_OFFSET);
+    System.out.println("Offset: " + offsetLong);
+    if (offsetLong != null) {
+      Set<TopicPartition> parts = context.assignment();
+      Iterator<TopicPartition> partsIt = parts.iterator();
+      while (partsIt.hasNext()) {
+        TopicPartition tp = partsIt.next();
+        context.offset(tp, offsetLong);    
+      }
+    }
   }
 
 }

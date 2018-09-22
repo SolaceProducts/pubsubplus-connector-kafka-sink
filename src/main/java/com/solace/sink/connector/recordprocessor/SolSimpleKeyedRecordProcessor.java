@@ -58,8 +58,10 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
     Object vk = record.key();
     String kafkaTopic = record.topic();
 
-    // add the original Kafka Topic to the binary user data
-    msg.setUserData(kafkaTopic.getBytes(StandardCharsets.UTF_8)); 
+    // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
+    String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition()
+        + ",O:" + record.kafkaOffset();
+    msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
 
     msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
 

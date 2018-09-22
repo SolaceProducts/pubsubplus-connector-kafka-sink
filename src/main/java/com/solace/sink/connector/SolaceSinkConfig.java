@@ -236,6 +236,10 @@ public class SolaceSinkConfig extends AbstractConfig {
             "The size of the sliding publisher window for Guaranteed messages.")
         .define(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY, Type.STRING, "NONE", Importance.MEDIUM,
             "This propert determines if a Kafka key record is created and the key to be used")
+        .define(SolaceSinkConstants.SOL_KAFKA_REPLAY_OFFSET, Type.LONG, null, Importance.LOW,
+            "This propert determines the offset to start processing on Connector Startup"
+            + ". Default of null means start from last saved offset, "
+            + "0 means from beginning of topic.")
 
         ;
 
