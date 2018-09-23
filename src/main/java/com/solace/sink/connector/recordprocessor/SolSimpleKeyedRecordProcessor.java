@@ -22,6 +22,8 @@ package com.solace.sink.connector.recordprocessor;
 import com.solace.sink.connector.SolRecordProcessor;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.SDTException;
+import com.solacesystems.jcsmp.SDTMap;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -53,17 +55,33 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
     }
 
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
-
-    Schema sk = record.keySchema();
+   
     Object vk = record.key();
-    String kafkaTopic = record.topic();
-
-    // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
+    
+    // Add Record Topic,Partition,Offset to Solace Msg in case we need to track offset restart
     String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition()
         + ",O:" + record.kafkaOffset();
     msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
-
+    
+    // Add Record Topic,Partition,Offset to Solace Msg as header properties 
+    // in case we need to track offset restart
+    SDTMap userHeader = JCSMPFactory.onlyInstance().createMap();
+    try {
+      userHeader.putString("k_topic", record.topic());
+      userHeader.putInteger("k_partition", record.kafkaPartition());
+      userHeader.putLong("k_offset", record.kafkaOffset());
+    } catch (SDTException e) {
+      log.info("Received Solace SDTException {}, with the following: {} ", 
+          e.getCause(), e.getStackTrace());
+    }
+    msg.setProperties(userHeader);
+    
+    String kafkaTopic = record.topic();
+    Schema sk = record.keySchema();
+    
     msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
+    
+    
 
     // If Topic was Keyed, use the key for correlationID
     if (keyheader != KeyHeader.NONE && keyheader != KeyHeader.DESTINATION) {

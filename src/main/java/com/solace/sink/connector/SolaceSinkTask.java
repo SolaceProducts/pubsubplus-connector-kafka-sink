@@ -157,7 +157,7 @@ public class SolaceSinkTask extends SinkTask {
    */
   public void open(Collection<TopicPartition> partitions) {
     Long offsetLong = sconfig.getLong(SolaceSinkConstants.SOL_KAFKA_REPLAY_OFFSET);
-    System.out.println("Offset: " + offsetLong);
+    log.debug("================Starting  for replay Offset: " + offsetLong);
     if (offsetLong != null) {
       Set<TopicPartition> parts = context.assignment();
       Iterator<TopicPartition> partsIt = parts.iterator();
