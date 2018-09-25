@@ -200,6 +200,23 @@ It is recommended to use Solace Topics when sending events if high throughput is
 
 Increasing the reliability of the Kafka Topic processing to reduce the potential loss or duplication, but will also greatly reduce throughput. When Kafka reliability is critical, it may be recommended to mimic this reliability with the Solace Sink Connector and configure the connector to send the Kafka records to the Event Mesh using Solace Queues. 
 
+#### Message Replay
+
+By default, the Solace Sink Connector will start sending Solace events based on the last Kafka Topic offset that was flushed before the connector was stopped. It is possible to use the Solace Sink Connector to replay messages from the Kafka Topic. 
+
+Adding a configuration entry allows the Solace Sink Connector to start processing from an offset position that is different from the last offset that was stored before the connector was stopped. This is controlled by adding the following entry to the connector configuration file:
+
+```ini
+sol.kakfa_replay_offset=<offset>
+```
+The offset is a Java Long value. A value of 0 will result in the replay of the entire Kafka Topic. A positive value will result in the replay from that offset value for the Kafka Topic. The same offset value will be used against all active partitions for that Kafka Topic.
+
+To make is easier to determine offset values for the Kafka Topic records, the three Record Processor samples included with this project include the sending of Solace message events that includes the Kafka Topic, Partition and Offset for every Kafka record that corresponds to the specific Solace event message. The Kafka information can be stored in multiple places in the Solace event message without adding the details to the data portion of the event. The three record processing samples add the data to the UserData Solace transport header and the Solace user-specific transport header that is sent as a "User Property Map". 
+
+A message dump from the Sink Connector generated Solace event messages that is generated using one of the sample Record Processors would be similar to:
+
+![Event Message Dump](resources/replayDump.png)  
+
 ## Contributing
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.

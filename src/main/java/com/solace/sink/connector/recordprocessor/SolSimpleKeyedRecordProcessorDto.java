@@ -22,6 +22,8 @@ package com.solace.sink.connector.recordprocessor;
 import com.solace.sink.connector.SolRecordProcessor;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.SDTException;
+import com.solacesystems.jcsmp.SDTMap;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -55,13 +57,28 @@ public class SolSimpleKeyedRecordProcessorDto implements SolRecordProcessor {
 
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
 
-
-
     Object vk = record.key();
+
+    // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
+    String userData = "T:" + record.topic() + ",P:" 
+        + record.kafkaPartition() + ",O:" + record.kafkaOffset();
+    msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
+    
+    // Add Record Topic,Partition,Offset to Solace Msg as header properties 
+    // in case we need to track offset restart
+    SDTMap userHeader = JCSMPFactory.onlyInstance().createMap();
+    try {
+      userHeader.putString("k_topic", record.topic());
+      userHeader.putInteger("k_partition", record.kafkaPartition());
+      userHeader.putLong("k_offset", record.kafkaOffset());
+    } catch (SDTException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    msg.setProperties(userHeader);
+    
     String kafkaTopic = record.topic();
 
-    msg.setUserData(kafkaTopic.getBytes(StandardCharsets.UTF_8)); // add the original Kafka Topic
-    //to the binary user data
     msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
     msg.setDeliverToOne(true); // Added DTO flag for topic consumer scaling
 
