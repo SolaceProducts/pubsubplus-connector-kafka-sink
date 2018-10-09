@@ -240,6 +240,8 @@ public class SolaceSinkConfig extends AbstractConfig {
             "This propert determines the offset to start processing on Connector Startup"
             + ". Default of null means start from last saved offset, "
             + "0 means from beginning of topic.")
+        .define(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Type.BOOLEAN, false, Importance.MEDIUM,
+            "Indicates whether the SolRecordProcessor should control the destination generation")
 
         ;
 

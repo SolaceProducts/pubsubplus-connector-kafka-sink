@@ -21,11 +21,14 @@ package com.solace.sink.connector;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
+import com.solacesystems.jcsmp.Destination;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.ProducerFlowProperties;
 import com.solacesystems.jcsmp.Queue;
+import com.solacesystems.jcsmp.SDTException;
+import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 import com.solacesystems.jcsmp.transaction.TransactedSession;
@@ -48,6 +51,7 @@ public class SolaceSinkSender {
   private SolaceSinkConfig sconfig;
   private XMLMessageProducer producer;
   private XMLMessageProducer txProducer;
+  private JCSMPSession session;
   private BytesXMLMessage message;
   private List<Topic> topics = new ArrayList<Topic>();
   private Queue solQueue;
@@ -73,6 +77,7 @@ public class SolaceSinkSender {
     this.sconfig = sconfig;
     this.txSession = txSession;
     this.sinkTask = sinkTask;
+    this.session = session;
 
     kafkaKey = this.sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
 
@@ -143,12 +148,38 @@ public class SolaceSinkSender {
       return;
     }
 
+    /*
     if (message.getUserData() == null) {
       log.trace("============Receive a Kafka record with no data ... discarded");
       return;
     }
+    */
+    
+    // Use Dynamic destination from SolRecordProcessor
+    if (sconfig.getBoolean(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION)) {
+      SDTMap userMap = message.getProperties();
+      Destination dest = null;
+      try {
+        dest = userMap.getDestination("dynamicDestination");
+      } catch (SDTException e) {
+        log.info("=================Received exception retrieving Dynamic Destination:  "
+            + "{}, with the following: {} ",
+            e.getCause(), e.getStackTrace());
+      }
+      try {
+        producer.send(message, dest);
+      } catch (JCSMPException e) {
+        log.trace(
+            "=================Received exception while sending message to topic {}:  "
+            + "{}, with the following: {} ",
+            dest.getName(), e.getCause(), e.getStackTrace());
+      }
+      
+      
+    }
+    
 
-    if (useTxforQueue) {
+    if (useTxforQueue  && !(sconfig.getBoolean(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION))) {
       try {
         message.setDeliveryMode(DeliveryMode.PERSISTENT);
         txProducer.send(message, solQueue);
@@ -162,7 +193,8 @@ public class SolaceSinkSender {
 
     }
 
-    if (topics.size() != 0 && message.getDestination() == null) {
+    if (topics.size() != 0 && message.getDestination() == null 
+          && !(sconfig.getBoolean(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION))) {
       message.setDeliveryMode(DeliveryMode.DIRECT);
       int count = 0;
       while (topics.size() > count) {
@@ -180,6 +212,9 @@ public class SolaceSinkSender {
       }
 
     }
+    
+
+    
     // Solace limits transaction size to 255 messages so need to force commit
     if (useTxforQueue && msgCounter.get() > 200) {
       log.debug("================Manually Flushing Offsets");
@@ -203,8 +238,10 @@ public class SolaceSinkSender {
             txSession.getStatus().name());
       }
     } catch (JCSMPException e) {
-      log.info("Received Solace exception {}, with the following: {} ", 
+      log.info("Received Solace TX exception {}, with the following: {} ", 
           e.getCause(), e.getStackTrace());
+      log.info("The TX error could be due to using dynamic destinations and "
+          + "  \"sol.dynamic_destination=true\" was not set in the configuration ");
       commited = false;
     }
     return commited;
@@ -215,15 +252,18 @@ public class SolaceSinkSender {
    * @return Boolean of Shutdown Status
    */
   public boolean shutdown() {
-    boolean success = true;
     if (txProducer != null) {
       txProducer.close();
     }
+    
     if (producer != null) {
       producer.close();
     }
-
-    return success;
+    if (session != null) {
+      session.closeSession();
+    }
+    
+    return true;
   }
 
 }

@@ -44,7 +44,7 @@ public class SolaceSinkConstants {
   public static final String SOL_LOCALHOST = "sol.localhost";
   public static final String SOL_CLIENT_NAME = "sol.client_name";
   public static final String SOL_GENERATE_SENDER_ID = "sol.generate_sender_id";
-  public static final String SOL_GENERATE_RCV_TIMESTAMPS = "sol.sol_generate_rcv_timestamps";
+  public static final String SOL_GENERATE_RCV_TIMESTAMPS = "sol.generate_rcv_timestamps";
   public static final String SOL_GENERATE_SEND_TIMESTAMPS = "sol.generate_send_timestamps";
   public static final String SOL_GENERATE_SEQUENCE_NUMBERS = "sol.generate_sequence_numbers";
   public static final String SOL_CALCULATE_MESSAGE_EXPIRATION = "sol.calculate_message_expiration";
@@ -134,5 +134,9 @@ public class SolaceSinkConstants {
   // Low importance, offset for replay - if null, continue from last offset when was last stopped
   // value of 0 is start from beginning
   public static final String SOL_KAFKA_REPLAY_OFFSET = "sol.kakfa_replay_offset";
+  
+  // Allow SolRecordProcessor to control the creation of destinations rather than SolaceSinkSender
+  // Requires a destination property in the user SDTMap with a key "dynamicDestination"
+  public static final String SOL_DYNAMIC_DESTINATION = "sol.dynamic_destination";
 
 }
