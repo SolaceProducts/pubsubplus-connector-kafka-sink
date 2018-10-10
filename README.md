@@ -235,7 +235,7 @@ SolDynamicDestinationRecordProcessor.java
 
 The sample is included with this project.
 
-It is important to note that if the destination is a Solace Queue, the network topic name for queues can be used. For example, if the queue is "testQueue", the dynamic topic would be "$P2P/QUE/testQueue".
+It is important to note that if the destination is a Solace Queue, the network topic name for queues can be used. For example, if the queue is "testQueue", the dynamic topic would be "#P2P/QUE/testQueue".
 
 #### Message Replay
 
