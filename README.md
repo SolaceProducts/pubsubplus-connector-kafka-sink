@@ -200,6 +200,43 @@ It is recommended to use Solace Topics when sending events if high throughput is
 
 Increasing the reliability of the Kafka Topic processing to reduce the potential loss or duplication, but will also greatly reduce throughput. When Kafka reliability is critical, it may be recommended to mimic this reliability with the Solace Sink Connector and configure the connector to send the Kafka records to the Event Mesh using Solace Queues. 
 
+#### Dynamic Destinations
+
+By default, the Sink Connector will send messages from the Kafka Records to the Destinations (Topic or Queues) defined in the configuration file (Properties or JSON file). In some cases, it may be desirable to send each Kafka Record to a different Solace Topic based on the details in the Kafka Record. This would mean that rather than using the static Solace Topic defined in the configuration file, a dynamic Solace Topic would need to be created for each record. 
+
+Generally, a Solace Topic is a hierarchical meta-data representation that describes the message payload. Therefore, it is generally possible to form a Solace Topic that matches the "rules" defined to generate a topic from the data in the payload. In this way each Kafka Record from the same Kafka Topic could be targeted to a potentially different Solace Topic.
+
+To make use of dynamic topics in the Solace Record Processors, it is necessary to update the configuration to indicate to the Solace Sink Connector to ignore the configuration destination references with the following entry:
+
+```ini
+sol.dynamic_destination=true
+```
+
+This entry in the configuration indicates that the actual destination must be defined in the record processor. To add the dynamic Solace Topic in the record processor, it necessary to add the details into the user defined Solace Header, for example:
+
+```ini
+    SDTMap userHeader = JCSMPFactory.onlyInstance().createMap();
+    try {
+      userHeader.putString("k_topic", record.topic());
+      userHeader.putInteger("k_partition", record.kafkaPartition());
+      userHeader.putLong("k_offset", record.kafkaOffset());
+      userHeader.putDestination("dynamicDestination", topic);
+    } catch (SDTException e) {
+      log.info("Received Solace SDTException {}, with the following: {} ", 
+          e.getCause(), e.getStackTrace());
+    }
+```
+
+In this case the "topic" is the Solace Topic that was created based on data in the Kafka record. Please refer to sample record processor for more details:
+
+```ini
+SolDynamicDestinationRecordProcessor.java
+```
+
+The sample is included with this project.
+
+It is important to note that if the destination is a Solace Queue, the network topic name for queues can be used. For example, if the queue is "testQueue", the dynamic topic would be "#P2P/QUE/testQueue".
+
 #### Message Replay
 
 By default, the Solace Sink Connector will start sending Solace events based on the last Kafka Topic offset that was flushed before the connector was stopped. It is possible to use the Solace Sink Connector to replay messages from the Kafka Topic. 
