@@ -222,9 +222,9 @@ public class SolSessionCreate {
    * @return boolean of shutdown result
    */
   public boolean shutdown() {
-    if (session != null) {
-      session.closeSession();
-    }
+
+    session.closeSession();
+
     return true;
 
   }

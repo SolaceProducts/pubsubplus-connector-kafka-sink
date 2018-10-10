@@ -259,9 +259,9 @@ public class SolaceSinkSender {
     if (producer != null) {
       producer.close();
     }
-    if (session != null) {
-      session.closeSession();
-    }
+
+    session.closeSession();
+
     
     return true;
   }
