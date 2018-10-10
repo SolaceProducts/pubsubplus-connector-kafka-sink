@@ -134,7 +134,7 @@ public class SolaceSinkConstants {
   // Low importance, offset for replay - if null, continue from last offset when was last stopped
   // value of 0 is start from beginning
   public static final String SOL_KAFKA_REPLAY_OFFSET = "sol.kakfa_replay_offset";
-  
+
   // Allow SolRecordProcessor to control the creation of destinations rather than SolaceSinkSender
   // Requires a destination property in the user SDTMap with a key "dynamicDestination"
   public static final String SOL_DYNAMIC_DESTINATION = "sol.dynamic_destination";

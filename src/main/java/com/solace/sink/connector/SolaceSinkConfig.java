@@ -243,6 +243,7 @@ public class SolaceSinkConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Type.BOOLEAN, false, Importance.MEDIUM,
             "Indicates whether the SolRecordProcessor should control the destination generation")
 
+
         ;
 
   }
