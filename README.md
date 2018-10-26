@@ -256,7 +256,7 @@ A message dump from the Sink Connector generated Solace event messages that is g
 
 ## Additional Information
 
-For additional information, use cases and explanatory videos, please visit the [Solace/Kafka Integration Guide](https://dev.solace.com/integration-guides/kafka-integration/)
+For additional information, use cases and explanatory videos, please visit the [Solace/Kafka Integration Guide](https://dev.solace.com/integration-guides/kafka-integration/).
 
 ## Contributing
 
