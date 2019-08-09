@@ -51,9 +51,10 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
     
     // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
-    String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition() 
-        + ",O:" + record.kafkaOffset();
-    msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
+    // limited in Kafka Topic size, replace using SDT below.
+    //String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition() 
+    //    + ",O:" + record.kafkaOffset();
+    //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
     
     Object v = record.value();
     String payload = "";
