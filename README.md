@@ -1,6 +1,6 @@
-[![Build Status](https://travis-ci.org/SolaceLabs/solace-kafka-connector-sink.svg?branch=development)](https://travis-ci.org/SolaceLabs/solace-kafka-connector)
+[![Build Status](https://travis-ci.org/SolaceLabs/pubsubplus-connector-kafka-sink.svg?branch=development)](https://travis-ci.org/SolaceLabs/pubsubplus-connector-kafka-sink)
 
-# Solace Sink Kafka Connector v1.0
+# PubSub+ Connector Kafka Sink v1.0
 ## Synopsis
 
 This project provides a Solace/Kafka Sink Connector (adapter) that makes use of the Kafka Connect libraries. The Solace/Kafka adapter consumes Kafka topic records and streams the data events to the Solace Event Mesh as a Topic and/or Queue data event. 
