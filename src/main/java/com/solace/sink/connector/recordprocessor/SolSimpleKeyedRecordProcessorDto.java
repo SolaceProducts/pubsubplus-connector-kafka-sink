@@ -60,9 +60,10 @@ public class SolSimpleKeyedRecordProcessorDto implements SolRecordProcessor {
     Object vk = record.key();
 
     // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
-    String userData = "T:" + record.topic() + ",P:" 
-        + record.kafkaPartition() + ",O:" + record.kafkaOffset();
-    msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
+    // limited in Kafka Topic size, replace using SDT below.
+    //String userData = "T:" + record.topic() + ",P:" 
+    //    + record.kafkaPartition() + ",O:" + record.kafkaOffset();
+    //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
     
     // Add Record Topic,Partition,Offset to Solace Msg as header properties 
     // in case we need to track offset restart
