@@ -55,6 +55,8 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
     //String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition() 
     //    + ",O:" + record.kafkaOffset();
     //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
+
+
     
     Object v = record.value();
     String payload = "";
