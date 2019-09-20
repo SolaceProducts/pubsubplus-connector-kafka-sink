@@ -138,5 +138,10 @@ public class SolaceSinkConstants {
   // Allow SolRecordProcessor to control the creation of destinations rather than SolaceSinkSender
   // Requires a destination property in the user SDTMap with a key "dynamicDestination"
   public static final String SOL_DYNAMIC_DESTINATION = "sol.dynamic_destination";
+  
+  //Low importance Kerberos details
+  public static final String SOL_KERBEROS_LOGIN_CONFIG = "sol.kerberos.login.conf";
+  public static final String SOL_KERBEROS_KRB5_CONFIG = "sol.kerberos.krb5.conf";  
+  
 
 }

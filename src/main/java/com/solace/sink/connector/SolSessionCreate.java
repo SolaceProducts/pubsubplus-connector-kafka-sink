@@ -163,6 +163,11 @@ public class SolSessionCreate {
    * Connect JCSMPSession.
    */
   public void connectSession() {
+	  
+    System.setProperty("java.security.auth.login.config",
+        lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_LOGIN_CONFIG));
+    System.setProperty("java.security.krb5.conf",
+        lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_KRB5_CONFIG));
 
     boolean connected = false;
     try {

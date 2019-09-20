@@ -242,6 +242,10 @@ public class SolaceSinkConfig extends AbstractConfig {
             + "0 means from beginning of topic.")
         .define(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Type.BOOLEAN, false, Importance.MEDIUM,
             "Indicates whether the SolRecordProcessor should control the destination generation")
+        .define(SolaceSinkConstants.SOL_KERBEROS_KRB5_CONFIG, Type.STRING, "", Importance.LOW,
+                "The location of the KRB5 configuration file for the Kerberos Server Detail")
+        .define(SolaceSinkConstants.SOL_KERBEROS_LOGIN_CONFIG, Type.STRING, "", Importance.LOW,
+            "Location of the Kerberos Login Configuration File")
 
 
         ;
