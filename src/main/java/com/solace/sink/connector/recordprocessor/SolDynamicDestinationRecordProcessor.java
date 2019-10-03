@@ -22,6 +22,7 @@ package com.solace.sink.connector.recordprocessor;
 import com.solace.sink.connector.SolRecordProcessor;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
@@ -109,6 +110,9 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
     msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
     
     msg.setProperties(userHeader);
+    
+    // Send Topic messages with Persistent flag set
+    msg.setDeliveryMode(DeliveryMode.PERSISTENT);
 
     log.debug("=================bus message: " + busMsg);
     

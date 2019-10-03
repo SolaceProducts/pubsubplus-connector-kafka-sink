@@ -208,7 +208,7 @@ public class SolaceSinkSender {
               topics.get(count).getName(), e.getCause(), e.getStackTrace());
 
         }
-        count++;
+        //count++;
       }
 
     }

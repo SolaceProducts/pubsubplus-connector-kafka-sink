@@ -42,6 +42,7 @@ public class SolStreamingMessageCallbackHandler implements JCSMPStreamingPublish
   @Override
   public void responseReceived(String messageId) {
     log.trace("Received ACK for message with ID: {}", messageId);
+    //System.out.println("Received ACK for message with ID: " + messageId);
 
   }
 
