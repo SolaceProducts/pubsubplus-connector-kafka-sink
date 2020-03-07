@@ -133,7 +133,7 @@ public class SolaceSinkSender {
 
   /**
    * Send Solace Message from Kafka Record.
-   * @param record Kakfa Records
+   * @param record Kafka Records
    */
   public void sendRecord(SinkRecord record) {
     message = processor.processRecord(kafkaKey, record);
@@ -175,7 +175,6 @@ public class SolaceSinkSender {
             dest.getName(), e.getCause(), e.getStackTrace());
       }
       
-      
     }
     
 
@@ -200,23 +199,22 @@ public class SolaceSinkSender {
       while (topics.size() > count) {
         try {
           producer.send(message, topics.get(count));
-          count++;
         } catch (JCSMPException e) {
           log.trace(
               "=================Received exception while sending message to topic {}:  "
               + "{}, with the following: {} ",
               topics.get(count).getName(), e.getCause(), e.getStackTrace());
-
         }
         count++;
       }
 
     }
     
-
+    // TODO: seems like a Hack
+    // How will Kafka know that these messages have been flushed and will not duplicate them?
     
     // Solace limits transaction size to 255 messages so need to force commit
-    if (useTxforQueue && msgCounter.get() > 200) {
+    if ( useTxforQueue && msgCounter.get() > sconfig.getInt(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE)-1 ) {
       log.debug("================Manually Flushing Offsets");
       sinkTask.flush(offsets);
     }

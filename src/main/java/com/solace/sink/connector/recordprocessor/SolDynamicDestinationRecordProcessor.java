@@ -54,17 +54,17 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
     // limited in Kafka Topic size, replace using SDT below.
     //String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition() 
     //    + ",O:" + record.kafkaOffset();
-    //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
+    //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8));
 
+    // TODO: reorg set SDTMap userHeader here
 
-    
-    Object v = record.value();
+    Object recordValue = record.value();
     String payload = "";
     Topic topic;
-    if (v instanceof byte[]) {
-      payload = new String((byte[]) v, StandardCharsets.UTF_8);
-    } else if (v instanceof ByteBuffer) {
-      payload = new String(((ByteBuffer) v).array(),StandardCharsets.UTF_8);
+    if (recordValue instanceof byte[]) {
+      payload = new String((byte[]) recordValue, StandardCharsets.UTF_8);
+    } else if (recordValue instanceof ByteBuffer) {
+      payload = new String(((ByteBuffer) recordValue).array(),StandardCharsets.UTF_8);
     }
     
     log.debug("==============================Payload: " + payload);
@@ -106,14 +106,14 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
     
     String kafkaTopic = record.topic();
     
-    msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
+    msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
     
     msg.setProperties(userHeader);
 
     log.debug("=================bus message: " + busMsg);
     
     msg.writeAttachment(busMsg.getBytes(StandardCharsets.UTF_8));
-    
+    // TODO: ^ duplicate!
     
     return msg;
   }

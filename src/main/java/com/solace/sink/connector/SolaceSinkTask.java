@@ -73,7 +73,9 @@ public class SolaceSinkTask extends SinkTask {
       sender.createTopics();
     }
     if (sconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
-      txEnabled = true;
+      
+        // TODO: Fix logic, as this is assumed to be TRUE even if code changed here
+        txEnabled = true;
       sender.useTx(txEnabled);
     }
 
@@ -130,6 +132,7 @@ public class SolaceSinkTask extends SinkTask {
           tp.partition(), om.offset());
     }
 
+    // TODO: how the transacted flag is taken into consideration?
     if (sconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
       boolean commited = sender.commit();
       if (!commited) {

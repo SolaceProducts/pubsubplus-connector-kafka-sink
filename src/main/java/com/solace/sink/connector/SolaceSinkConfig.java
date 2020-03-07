@@ -115,6 +115,10 @@ public class SolaceSinkConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_SUB_ACK_WINDOW_SIZE, 
             Type.INT, 255, Importance.LOW,
             "The size of the sliding subscriber ACK window. The valid range is 1-255")
+        .define(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE, 
+            Type.INT, 200, Importance.LOW,
+            "Number of outstanding transacted messages before autoflush. Must be lower than "
+            + "max PubSub+ transaction size (255). The valid range is 1-200")
         .define(SolaceSinkConstants.SOl_AUTHENTICATION_SCHEME, 
             Type.STRING, "AUTHENTICATION_SCHEME_BASIC",
             Importance.MEDIUM, "String property specifying the authentication scheme.")

@@ -110,6 +110,7 @@ public class SolaceSinkConstants {
   // Low Importance Persistent Message Properties
   public static final String SOL_SUB_ACK_WINDOW_SIZE = "sol.sub_ack_window_size";
   public static final String SOL_PUB_ACK_WINDOW_SIZE = "sol.sub_ack_window_size";
+  public static final String SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE = "sol.autoflush.size";
   public static final String SOL_SUB_ACK_TIME = "sol.sub_ack_time";
   public static final String SOL_PUB_ACK_TIME = "sol.pub_ack_time";
   public static final String SOL_SUB_ACK_WINDOW_THRESHOLD = "sol.sub_ack_window_threshold";
@@ -133,7 +134,7 @@ public class SolaceSinkConstants {
   
   // Low importance, offset for replay - if null, continue from last offset when was last stopped
   // value of 0 is start from beginning
-  public static final String SOL_KAFKA_REPLAY_OFFSET = "sol.kakfa_replay_offset";
+  public static final String SOL_KAFKA_REPLAY_OFFSET = "sol.kafka_replay_offset";
 
   // Allow SolRecordProcessor to control the creation of destinations rather than SolaceSinkSender
   // Requires a destination property in the user SDTMap with a key "dynamicDestination"

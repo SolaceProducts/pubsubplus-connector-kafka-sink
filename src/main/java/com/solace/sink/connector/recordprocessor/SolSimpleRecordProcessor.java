@@ -41,7 +41,7 @@ public class SolSimpleRecordProcessor implements SolRecordProcessor {
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
     
 
-    // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
+    // Add Record Topic,Partition,Offset to Solace Msg in case we need to track offset restart
     // limited in Kafka Topic size, replace using SDT below.
     //String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition() 
     //    + ",O:" + record.kafkaOffset();
@@ -63,7 +63,7 @@ public class SolSimpleRecordProcessor implements SolRecordProcessor {
     Schema s = record.valueSchema();
     String kafkaTopic = record.topic();
     
-    msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
+    msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
     Object v = record.value();
     log.debug("Value schema {}", s);
     if (v == null) {
@@ -73,17 +73,22 @@ public class SolSimpleRecordProcessor implements SolRecordProcessor {
       log.debug("No schema info {}", v);
       if (v instanceof byte[]) {
         msg.writeAttachment((byte[]) v);
-
       } else if (v instanceof ByteBuffer) {
         msg.writeAttachment((byte[]) ((ByteBuffer) v).array());
       }
+      // TODO: how about String?
+      // TODO: log nothing found
     } else if (s.type() == Schema.Type.BYTES) {
       if (v instanceof byte[]) {
         msg.writeAttachment((byte[]) v);
       } else if (v instanceof ByteBuffer) {
         msg.writeAttachment((byte[]) ((ByteBuffer) v).array());
       }
+      // TODO: log nothing found
     }
+    // TODO: log if unknown schema = message loss
+    
+    
     return msg;
   }
 

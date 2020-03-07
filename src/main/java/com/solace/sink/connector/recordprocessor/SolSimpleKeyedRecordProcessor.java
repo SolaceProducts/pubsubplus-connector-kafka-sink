@@ -56,7 +56,7 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
 
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
    
-    Object vk = record.key();
+    Object recordKey = record.key();
     
     // Add Record Topic,Partition,Offset to Solace Msg in case we need to track offset restart
     // limited in Kafka Topic size, replace using SDT below.
@@ -78,62 +78,69 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
     msg.setProperties(userHeader);
     
     String kafkaTopic = record.topic();
-    Schema sk = record.keySchema();
+    Schema keyschema = record.keySchema();
     
-    msg.setApplicationMessageType("ResendOfKakfaTopic: " + kafkaTopic);
+    msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
     
     
 
     // If Topic was Keyed, use the key for correlationID
     if (keyheader != KeyHeader.NONE && keyheader != KeyHeader.DESTINATION) {
 
-      if (vk != null) {
-        if (sk == null) {
-          log.trace("No schema info {}", vk);
-          if (vk instanceof byte[]) {
-            msg.setCorrelationId(new String((byte[]) vk, StandardCharsets.UTF_8));
-          } else if (vk instanceof ByteBuffer) {
-            msg.setCorrelationId(new String(((ByteBuffer) vk).array(), StandardCharsets.UTF_8));
+      if (recordKey != null) {
+        if (keyschema == null) {
+          log.trace("No schema info {}", recordKey);
+          if (recordKey instanceof byte[]) {
+            msg.setCorrelationId(new String((byte[]) recordKey, StandardCharsets.UTF_8));
+          } else if (recordKey instanceof ByteBuffer) {
+            msg.setCorrelationId(new String(((ByteBuffer) recordKey).array(), StandardCharsets.UTF_8));
           } else {
-            msg.setCorrelationId(vk.toString());
+            msg.setCorrelationId(recordKey.toString());
           }
-        } else if (sk.type() == Schema.Type.BYTES) {
-          if (vk instanceof byte[]) {
-            msg.setCorrelationId(new String((byte[]) vk, StandardCharsets.UTF_8));
-          } else if (vk instanceof ByteBuffer) {
-            msg.setCorrelationId(new String(((ByteBuffer) vk).array(), StandardCharsets.UTF_8));
+        } else if (keyschema.type() == Schema.Type.BYTES) {
+          if (recordKey instanceof byte[]) {
+            msg.setCorrelationId(new String((byte[]) recordKey, StandardCharsets.UTF_8));
+          } else if (recordKey instanceof ByteBuffer) {
+            msg.setCorrelationId(new String(((ByteBuffer) recordKey).array(), StandardCharsets.UTF_8));
           }
-        } else if (sk.type() == Schema.Type.STRING) {
-          msg.setCorrelationId((String) vk);
+        } else if (keyschema.type() == Schema.Type.STRING) {
+          msg.setCorrelationId((String) recordKey);
         }
+        // TODO: log no applicable schema
       }
 
-    } else if (keyheader == KeyHeader.DESTINATION && sk.type() == Schema.Type.STRING) {
-      msg.setCorrelationId((String) vk);
+    } else if (keyheader == KeyHeader.DESTINATION && keyschema.type() == Schema.Type.STRING) {
+      
+        // Destination is already determined by sink settings so set just the correlationId.
+        // Receiving app can evaluate it 
+        msg.setCorrelationId((String) recordKey);
     }
 
-    Schema s = record.valueSchema();
-    Object v = record.value();
+    Schema valueSchema = record.valueSchema();
+    Object recordValue = record.value();
     // get message body details from record
-    log.debug("Value schema {}", s);
-    if (v == null) {
+    log.debug("Value schema {}", valueSchema);
+    if (recordValue == null) {
       msg.reset();
       return msg;
-    } else if (s == null) {
-      log.debug("No schema info {}", v);
-      if (v instanceof byte[]) {
-        msg.writeAttachment((byte[]) v);
+    } else if (valueSchema == null) {
+      log.debug("No schema info {}", recordValue);
+      if (recordValue instanceof byte[]) {
+        msg.writeAttachment((byte[]) recordValue);
 
-      } else if (v instanceof ByteBuffer) {
-        msg.writeAttachment((byte[]) ((ByteBuffer) v).array());
+      } else if (recordValue instanceof ByteBuffer) {
+        msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
       }
-    } else if (s.type() == Schema.Type.BYTES) {
-      if (v instanceof byte[]) {
-        msg.writeAttachment((byte[]) v);
-      } else if (v instanceof ByteBuffer) {
-        msg.writeAttachment((byte[]) ((ByteBuffer) v).array());
+      // TODO: log nothing found
+    } else if (valueSchema.type() == Schema.Type.BYTES) {
+      if (recordValue instanceof byte[]) {
+        msg.writeAttachment((byte[]) recordValue);
+      } else if (recordValue instanceof ByteBuffer) {
+        msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
       }
+      // TODO: log nothing found
     }
+    // TODO: log no applicable schema found - Schema.Type.STRING ???
 
     return msg;
   }
