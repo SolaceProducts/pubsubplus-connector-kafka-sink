@@ -184,6 +184,7 @@ public class SinkConnectorIT implements TestConstants {
         void setUp() {
             Properties prop = new Properties();
             prop.setProperty("sol.record_processor_class", "com.solace.sink.connector.recordprocessor.SolSimpleRecordProcessor");
+            prop.setProperty("sol.dynamic_destination", "false");
             prop.setProperty("sol.topics", String.join(", ", topics));
             prop.setProperty("sol.queue", SOL_QUEUE);
             connectorDeployment.startConnector(prop);
@@ -213,6 +214,7 @@ public class SinkConnectorIT implements TestConstants {
         void setUp() {
             Properties prop = new Properties();
             prop.setProperty("sol.record_processor_class", "com.solace.sink.connector.recordprocessor.SolSimpleKeyedRecordProcessor");
+            prop.setProperty("sol.dynamic_destination", "false");
             prop.setProperty("sol.topics", String.join(", ", topics));
             prop.setProperty("sol.kafka_message_key", "NONE");
             prop.setProperty("sol.queue", SOL_QUEUE);
@@ -243,6 +245,7 @@ public class SinkConnectorIT implements TestConstants {
         void setUp() {
             Properties prop = new Properties();
             prop.setProperty("sol.record_processor_class", "com.solace.sink.connector.recordprocessor.SolSimpleKeyedRecordProcessor");
+            prop.setProperty("sol.dynamic_destination", "false");
             prop.setProperty("sol.topics", String.join(", ", topics));
             prop.setProperty("sol.kafka_message_key", "DESTINATION");
             prop.setProperty("sol.queue", SOL_QUEUE);
@@ -274,6 +277,7 @@ public class SinkConnectorIT implements TestConstants {
         void setUp() {
             Properties prop = new Properties();
             prop.setProperty("sol.record_processor_class", "com.solace.sink.connector.recordprocessor.SolSimpleKeyedRecordProcessor");
+            prop.setProperty("sol.dynamic_destination", "false");
             prop.setProperty("sol.topics", String.join(", ", topics));
             prop.setProperty("sol.kafka_message_key", "CORRELATION_ID");
             prop.setProperty("sol.queue", SOL_QUEUE);
@@ -305,6 +309,7 @@ public class SinkConnectorIT implements TestConstants {
         void setUp() {
             Properties prop = new Properties();
             prop.setProperty("sol.record_processor_class", "com.solace.sink.connector.recordprocessor.SolSimpleKeyedRecordProcessor");
+            prop.setProperty("sol.dynamic_destination", "false");
             prop.setProperty("sol.topics", String.join(", ", topics));
             prop.setProperty("sol.kafka_message_key", "CORRELATION_ID_AS_BYTES");
             prop.setProperty("sol.queue", SOL_QUEUE);

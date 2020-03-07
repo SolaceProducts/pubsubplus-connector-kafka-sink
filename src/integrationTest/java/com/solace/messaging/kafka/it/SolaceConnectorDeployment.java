@@ -161,7 +161,7 @@ public class SolaceConnectorDeployment  implements TestConstants {
             String configresults = configresponse.body().string();
             logger.info("Connector config results: " + configresults);
             // check success
-            Thread.sleep(10000); // Give some time to start
+            Thread.sleep(5000); // Give some time to start
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
