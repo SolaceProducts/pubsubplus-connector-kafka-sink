@@ -68,6 +68,7 @@ public class SinkConnectorIT implements TestConstants {
     static Logger logger = LoggerFactory.getLogger(SinkConnectorIT.class.getName());
     static TestSolaceConsumer solaceConsumer = new TestSolaceConsumer("tcp://" + MessagingServiceFullLocalSetup.COMPOSE_CONTAINER_PUBSUBPLUS
                             .getServiceHost("solbroker_1", 55555) + ":55555", "default", "default", "default");
+    // Connectordeployment creates a Kafka topic "kafkaTestTopic", which is used next
     static SolaceConnectorDeployment connectorDeployment = new SolaceConnectorDeployment();
     static TestKafkaProducer kafkaProducer = new TestKafkaProducer(connectorDeployment.kafkaTestTopic);
     static enum AdditionalCheck { ATTACHMENTBYTEBUFFER, CORRELATIONID }
