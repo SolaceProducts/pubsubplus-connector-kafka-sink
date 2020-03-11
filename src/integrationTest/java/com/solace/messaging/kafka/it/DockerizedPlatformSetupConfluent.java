@@ -14,7 +14,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 
-public class DockerizedPlatformSetup implements MessagingServiceFullLocalSetup {
+public class DockerizedPlatformSetupConfluent implements MessagingServiceFullLocalSetupConfluent {
 
     @DisplayName("Local MessagingService connection tests")
     @Nested
@@ -29,9 +29,9 @@ public class DockerizedPlatformSetup implements MessagingServiceFullLocalSetup {
                         .withExposedPorts(28083,5005)
                         .withEnv("CONNECT_REST_PORT", "28083")
 //
-                        // Enable remote debug session at default port 5005
-                        .withEnv("KAFKA_DEBUG", "y")
-                        .withEnv("DEBUG_SUSPEND_FLAG", "y")
+//                        // Enable remote debug session at default port 5005
+//                        .withEnv("KAFKA_DEBUG", "y")
+//                        .withEnv("DEBUG_SUSPEND_FLAG", "y")
 //
                         .withEnv("CONNECT_GROUP_ID", "quickstart-avro")
                         .withEnv("CONNECT_CONFIG_STORAGE_TOPIC", "quickstart-avro-config")
@@ -54,7 +54,7 @@ public class DockerizedPlatformSetup implements MessagingServiceFullLocalSetup {
                         .withEnv("CONNECT_REST_ADVERTISED_HOST_NAME", "localhost")
                         .withEnv("CONNECT_LOG4J_ROOT_LOGLEVEL", "INFO")
                         .withEnv("CONNECT_PLUGIN_PATH", "/usr/share/java,/etc/kafka-connect/jars")
-                        .withClasspathResourceMapping(CONNECTORLIB,
+                        .withClasspathResourceMapping("pubsubplus-connector-kafka-sink/lib",
                                         "/etc/kafka-connect/jars/pubsubplus-connector-kafka", BindMode.READ_ONLY)
 //                        .waitingFor( Wait.forHealthcheck() );
                         .waitingFor( Wait.forLogMessage(".*Kafka Connect started.*", 1) );

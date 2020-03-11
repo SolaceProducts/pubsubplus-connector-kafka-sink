@@ -23,7 +23,7 @@ public class TestKafkaProducer  implements TestConstants {
     }
 
     public void start() {
-        String bootstrapServers = MessagingServiceFullLocalSetup.COMPOSE_CONTAINER_KAFKA.getServiceHost("kafka_1", 39092)
+        String bootstrapServers = MessagingServiceFullLocalSetupConfluent.COMPOSE_CONTAINER_KAFKA.getServiceHost("kafka_1", 39092)
                         + ":39092";
         
         // create Producer properties
