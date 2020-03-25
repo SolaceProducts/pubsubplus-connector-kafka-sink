@@ -28,8 +28,7 @@ public class TestKafkaConsumer {
 
     public void run() {
 
-        String bootstrapServers = MessagingServiceFullLocalSetup.COMPOSE_CONTAINER_KAFKA.getServiceHost("kafka_1", 39092)
-                        + ":39092";
+        String bootstrapServers = new TestConfigProperties().getProperty("kafka.bootstrap_servers");
         String groupId = "test";
         String topic = MessagingServiceFullLocalSetup.KAFKA_TOPIC;
 

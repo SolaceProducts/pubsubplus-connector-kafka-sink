@@ -54,8 +54,7 @@ public class ConnectorIT implements TestConstants {
 
     static Logger logger = LoggerFactory.getLogger(ConnectorIT.class.getName());
     static TestKafkaConsumer kafkaConsumer = new TestKafkaConsumer();
-    static TestSolaceProducer solaceProducer = new TestSolaceProducer("tcp://" + MessagingServiceFullLocalSetup.COMPOSE_CONTAINER_PUBSUBPLUS
-                            .getServiceHost("solbroker_1", 55555) + ":55555", "default", "default", "default");
+    static TestSolaceProducer solaceProducer = new TestSolaceProducer();
     static SolaceConnectorDeployment connectorDeployment = new SolaceConnectorDeployment();
     
     ////////////////////////////////////////////////////
