@@ -19,13 +19,8 @@
 
 package com.solace.sink.connector;
 
-import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPSessionStats;
-import com.solacesystems.jcsmp.statistics.StatType;
-import com.solacesystems.jcsmp.transaction.TransactedSession;
-
+import com.solacesystems.jcsmp.JCSMPException;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -40,14 +35,12 @@ import org.slf4j.LoggerFactory;
 
 public class SolaceSinkTask extends SinkTask {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkTask.class);
-  private SolSessionCreate sessionRef;
-  private TransactedSession txSession = null;
-  private JCSMPSession session;
-  private SolaceSinkSender sender;
-  private boolean txEnabled = false;
+  private SolSessionHandler solSessionHandler;
+  private SolaceSinkSender solSender;
+  private boolean useTxforQueue = false;
   private SinkTaskContext context;
 
-  SolaceSinkConfig sconfig;
+  SolaceSinkConnectorConfig connectorConfig;
 
   @Override
   public String version() {
@@ -56,29 +49,48 @@ public class SolaceSinkTask extends SinkTask {
 
   @Override
   public void start(Map<String, String> props) {
-    sconfig = new SolaceSinkConfig(props);  
-
-    sessionRef = new SolSessionCreate(sconfig);
-    sessionRef.configureSession();
-    sessionRef.connectSession();
-    txSession = sessionRef.getTxSession();
-    session = sessionRef.getSession();
-    if (txSession != null) {
-      log.info("======================TransactedSession JCSMPSession Connected");
+    connectorConfig = new SolaceSinkConnectorConfig(props);  
+    solSessionHandler = new SolSessionHandler(connectorConfig);
+    try {
+      solSessionHandler.configureSession();
+      solSessionHandler.connectSession();
+    } catch (JCSMPException e) {
+      failStart(e, "================ Failed to create JCSMPSession");
     }
-
-    sender = new SolaceSinkSender(sconfig, session, txSession, this);
-
-    if (sconfig.getString(SolaceSinkConstants.SOL_TOPICS) != null) {
-      sender.createTopics();
+    log.info("================ JCSMPSession Connected");
+    
+    if (connectorConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
+      // Use transactions for queue destination
+      useTxforQueue = connectorConfig.getBoolean(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE);
+      if (useTxforQueue) {
+        try {
+          solSessionHandler.createTxSession();
+          log.info("================ Transacted Session has been Created for PubSub+ queue destination");
+        } catch (JCSMPException e) {
+          failStart(e, "================ Failed to create Transacted Session for PubSub+ queue destination, "
+              + "make sure transacted sessions are enabled");
+        }
+      }
     }
-    if (sconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
-      
-        // TODO: Fix logic, as this is assumed to be TRUE even if code changed here
-        txEnabled = true;
-      sender.useTx(txEnabled);
+    
+    try {
+      solSender = new SolaceSinkSender(connectorConfig, solSessionHandler, useTxforQueue);
+      if (connectorConfig.getString(SolaceSinkConstants.SOL_TOPICS) != null) {
+        solSender.setupDestinationTopics();
+      }
+      if (connectorConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
+        solSender.setupDestinationQueue();
+      }
+    } catch (JCSMPException e) {
+      failStart(e, "Failed to setup sender to PubSub+");
     }
-
+  }
+  
+  private void failStart(JCSMPException e, String logMessage) {
+    log.info("Received Solace exception {}, with the "
+        + "following: {} ", e.getCause(), e.getStackTrace());
+    log.info( "message");
+    stop();  // Connector cannot continue
   }
 
   @Override
@@ -87,38 +99,22 @@ public class SolaceSinkTask extends SinkTask {
       log.trace("Putting record to topic {}, partition {} and offset {}", r.topic(), 
           r.kafkaPartition(),
           r.kafkaOffset());
-      sender.sendRecord(r);
+      solSender.sendRecord(r);
     }
-
   }
 
   @Override
   public void stop() {
-    if (session != null) {
-      JCSMPSessionStats lastStats = session.getSessionStats();
-      Enumeration<StatType> estats = StatType.elements();
-      log.info("Final Statistics summary:");
-
-      while (estats.hasMoreElements()) {
-        StatType statName = estats.nextElement();
-        System.out.println("\t" + statName.getLabel() + ": " + lastStats.getStat(statName));
-      }
-      log.info("\n");
+    log.info("================ Shutting down PubSub+ Sink Connector");
+    if (solSender != null) {
+      solSender.shutdown();
     }
-    boolean ok = true;
-    log.info("==================Shutting down Solace Source Connector");
-
-    if (sender != null) {
-      ok = sender.shutdown();
+    if (solSessionHandler != null) {
+      log.info("Final Statistics summary:\n");
+      solSessionHandler.printStats();
+      solSessionHandler.shutdown();
     }
-    if (session != null) {
-      ok = sessionRef.shutdown();
-    }
-
-    if (!(ok)) {
-      log.info("Solace session failed to shutdown");
-    }
-
+    log.info("PubSub+ Sink Connector stopped");
   }
 
   /**
@@ -131,16 +127,13 @@ public class SolaceSinkTask extends SinkTask {
       log.debug("Flushing up to topic {}, partition {} and offset {}", tp.topic(), 
           tp.partition(), om.offset());
     }
-
-    // TODO: how the transacted flag is taken into consideration?
-    if (sconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
-      boolean commited = sender.commit();
+    if (useTxforQueue) {
+      boolean commited = solSender.commit();
       if (!commited) {
-        log.info("==============error in commiting transaction, shutting down");
+        log.info("Error in commiting transaction, shutting down");
         stop();
       }
     }
-
   }
 
   /**
@@ -159,8 +152,8 @@ public class SolaceSinkTask extends SinkTask {
    * @param partitions List of TopicPartitions for Topic
    */
   public void open(Collection<TopicPartition> partitions) {
-    Long offsetLong = sconfig.getLong(SolaceSinkConstants.SOL_KAFKA_REPLAY_OFFSET);
-    log.debug("================Starting  for replay Offset: " + offsetLong);
+    Long offsetLong = connectorConfig.getLong(SolaceSinkConstants.SOL_KAFKA_REPLAY_OFFSET);
+    log.debug("================ Starting  for replay Offset: " + offsetLong);
     if (offsetLong != null) {
       Set<TopicPartition> parts = context.assignment();
       Iterator<TopicPartition> partsIt = parts.iterator();

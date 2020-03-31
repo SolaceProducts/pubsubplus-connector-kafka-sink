@@ -62,6 +62,7 @@ public class SolaceSinkConstants {
   public static final String SOl_AUTHENTICATION_SCHEME = "sol.authentication_scheme";
   public static final String SOL_KRB_SERVICE_NAME = "sol.krb_service_name";
   public static final String SOL_SSL_CONNECTION_DOWNGRADE_TO = "sol.ssl_connection_downgrade_to";
+  public static final String SOl_USE_TRANSACTIONS_FOR_QUEUE = "sol.use_transactions_for_queue";
 
   // Low Importance Solace TLS Protocol properties
   // public static final String SOL_SSL_PROTOCOL = "sol.ssl_protocol";

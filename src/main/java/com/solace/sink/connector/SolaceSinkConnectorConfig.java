@@ -28,15 +28,15 @@ import org.apache.kafka.common.config.ConfigDef.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SolaceSinkConfig extends AbstractConfig {
+public class SolaceSinkConnectorConfig extends AbstractConfig {
 
-  private static final Logger log = LoggerFactory.getLogger(SolaceSinkConfig.class);
+  private static final Logger log = LoggerFactory.getLogger(SolaceSinkConnectorConfig.class);
   
   /**
    * Create Solace Configuration Properties from JSON or Properties file.
    * @param properties returns Properties
    */
-  public SolaceSinkConfig(Map<String, String> properties) {
+  public SolaceSinkConnectorConfig(Map<String, String> properties) {
     super(config, properties);
 
     log.info("==================Initialize Connnector properties");
@@ -131,6 +131,9 @@ public class SolaceSinkConfig extends AbstractConfig {
             "Session property specifying a transport protocol that SSL session "
             + "connection will be downgraded to after client authentication. "
             + "Allowed values: TRANSPORT_PROTOCOL_PLAIN_TEXT.")
+        .define(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, 
+            Type.BOOLEAN, true, Importance.LOW,
+            "Specifies if writing messages to queue destination shall use transactions.")
         .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectTimeoutInMillis, 
             Type.INT, 30000, Importance.MEDIUM,
             "Timeout value (in ms) for creating an initial connection to Solace")

@@ -14,6 +14,7 @@ import org.apache.kafka.connect.data.SchemaAndValue;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -153,7 +154,7 @@ public class SinkConnectorIT implements TestConstants {
                 if (additionalChecks != null) {
                     for (Map.Entry<AdditionalCheck, String> check : additionalChecks.entrySet()) {
                         if (check.getKey() == AdditionalCheck.ATTACHMENTBYTEBUFFER) {
-                            // Verify contents of the message correlationId
+                            // Verify contents of the message AttachmentByteBuffer
                             assert(Arrays.equals((byte[])message.getAttachmentByteBuffer().array(),check.getValue().getBytes()));
                         }
                         if (check.getKey() == AdditionalCheck.CORRELATIONID) {
@@ -173,6 +174,35 @@ public class SinkConnectorIT implements TestConstants {
     
     ////////////////////////////////////////////////////
     // Scenarios
+    
+    @DisplayName("Sink SimpleMessageProcessor Perf tests")
+    @Nested
+    @TestInstance(Lifecycle.PER_CLASS)
+    @Disabled
+    class SinkConnectorSimpleMessageProcessorPerfTests {
+        
+        String topics[] = {SOL_ROOT_TOPIC+"/TestTopic1/SubTopic"};
+        
+        @BeforeAll
+        void setUp() {
+            Properties prop = new Properties();
+            prop.setProperty("sol.record_processor_class", "com.solace.sink.connector.recordprocessor.SolSimpleRecordProcessor");
+            prop.setProperty("sol.dynamic_destination", "false");
+            prop.setProperty("sol.topics", String.join(", ", topics));
+            connectorDeployment.startConnector(prop);
+        }
+
+
+        @DisplayName("TextMessage-QueueAndTopics-SolSampleSimpleMessageProcessor")
+        @Test
+        void kafkaConsumerTextMessageToTopicTest() {
+            messageToKafkaTest(null, topics,
+                            // kafka key and value
+                            "Key", "Hello TextMessageToTopicTest world!",
+                            // additional checks
+                            ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, "Hello TextMessageToTopicTest world!"));
+        }
+    }
     
     @DisplayName("Sink SimpleMessageProcessor tests")
     @Nested

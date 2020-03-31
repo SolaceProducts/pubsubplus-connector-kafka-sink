@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public class SolaceSinkConnector extends SinkConnector {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkConnector.class);
 
-  SolaceSinkConfig sconfig;
+  SolaceSinkConnectorConfig sconfig;
   private Map<String, String> sconfigProperties;
 
   @Override
@@ -46,7 +46,7 @@ public class SolaceSinkConnector extends SinkConnector {
   public void start(Map<String, String> props) {
     log.info("==================== Start a SolaceSinkConnector");
     sconfigProperties = props;
-    sconfig = new SolaceSinkConfig(props);
+    sconfig = new SolaceSinkConnectorConfig(props);
   }
 
   @Override
@@ -74,7 +74,7 @@ public class SolaceSinkConnector extends SinkConnector {
   @Override
   public ConfigDef config() {
     log.info("==================== Requesting Config for  SolaceSinkConnector");
-    return SolaceSinkConfig.config;
+    return SolaceSinkConnectorConfig.config;
   }
 
 }

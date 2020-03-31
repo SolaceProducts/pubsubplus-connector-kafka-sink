@@ -26,8 +26,6 @@ import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
@@ -40,18 +38,11 @@ public class SolSimpleRecordProcessor implements SolRecordProcessor {
   public BytesXMLMessage processRecord(String skey, SinkRecord record) {
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
     
-
-    // Add Record Topic,Partition,Offset to Solace Msg in case we need to track offset restart
-    // limited in Kafka Topic size, replace using SDT below.
-    //String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition() 
-    //    + ",O:" + record.kafkaOffset();
-    //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
-    
-    // Add Record Topic,Partition,Offset to Solace Msg as header properties 
-    // in case we need to track offset restart
+    // Add Record Topic,Partition,Offset to Solace Msg
+    String kafkaTopic = record.topic();
     SDTMap userHeader = JCSMPFactory.onlyInstance().createMap();
     try {
-      userHeader.putString("k_topic", record.topic());
+      userHeader.putString("k_topic", kafkaTopic);
       userHeader.putInteger("k_partition", record.kafkaPartition());
       userHeader.putLong("k_offset", record.kafkaOffset());
     } catch (SDTException e) {
@@ -59,35 +50,40 @@ public class SolSimpleRecordProcessor implements SolRecordProcessor {
           e.getCause(), e.getStackTrace());
     }
     msg.setProperties(userHeader);
-    
-    Schema s = record.valueSchema();
-    String kafkaTopic = record.topic();
-    
     msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
-    Object v = record.value();
-    log.debug("Value schema {}", s);
-    if (v == null) {
-      msg.reset();
-      return msg;
-    } else if (s == null) {
-      log.debug("No schema info {}", v);
-      if (v instanceof byte[]) {
-        msg.writeAttachment((byte[]) v);
-      } else if (v instanceof ByteBuffer) {
-        msg.writeAttachment((byte[]) ((ByteBuffer) v).array());
-      }
-      // TODO: how about String?
-      // TODO: log nothing found
-    } else if (s.type() == Schema.Type.BYTES) {
-      if (v instanceof byte[]) {
-        msg.writeAttachment((byte[]) v);
-      } else if (v instanceof ByteBuffer) {
-        msg.writeAttachment((byte[]) ((ByteBuffer) v).array());
-      }
-      // TODO: log nothing found
-    }
-    // TODO: log if unknown schema = message loss
     
+    Schema valueSchema = record.valueSchema();
+    Object recordValue = record.value();
+    // get message body details from record
+    if (recordValue != null) {
+      if (valueSchema == null) {
+        log.trace("No schema info {}", recordValue);
+        if (recordValue instanceof byte[]) {
+          msg.writeAttachment((byte[]) recordValue);
+        } else if (recordValue instanceof ByteBuffer) {
+          msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
+        } else if (recordValue instanceof String) {
+          msg.writeAttachment(((String) recordValue).getBytes());
+        } else {
+          // Unknown recordValue type
+          msg.reset();
+        }
+      } else if (valueSchema.type() == Schema.Type.BYTES) {
+        if (recordValue instanceof byte[]) {
+          msg.writeAttachment((byte[]) recordValue);
+        } else if (recordValue instanceof ByteBuffer) {
+          msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
+        }
+      } else if (valueSchema.type() == Schema.Type.STRING) {
+        msg.writeAttachment(((String) recordValue).getBytes());
+      } else {
+        // Do nothing in all other cases 
+        msg.reset();
+      }
+    } else {
+      // Invalid message
+      msg.reset();
+    }
     
     return msg;
   }

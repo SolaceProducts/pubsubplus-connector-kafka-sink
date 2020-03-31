@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * Note: this example expects a record written to a Kafka topic that has the format:
  * "busId" "Message", where there is a space in between the strings. 
  * 
- * It requires the configuration property "sol.dynamic_destination=true" to be set. 
+ * It also requires the configuration property "sol.dynamic_destination=true" to be set. 
  */
 
 public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor {
@@ -50,13 +50,9 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
   public BytesXMLMessage processRecord(String skey, SinkRecord record) {
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
     
-    // Add Record Topic,Parition,Offset to Solace Msg in case we need to track offset restart
-    // limited in Kafka Topic size, replace using SDT below.
-    //String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition() 
-    //    + ",O:" + record.kafkaOffset();
-    //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8));
-
-    // TODO: reorg set SDTMap userHeader here
+    // Add Record Topic,Partition,Offset to Solace Msg
+    String kafkaTopic = record.topic();
+    msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
 
     Object recordValue = record.value();
     String payload = "";
@@ -66,36 +62,27 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
     } else if (recordValue instanceof ByteBuffer) {
       payload = new String(((ByteBuffer) recordValue).array(),StandardCharsets.UTF_8);
     }
-    
-    log.debug("==============================Payload: " + payload);
+    log.debug("================ Payload: " + payload);
     
     String busId = payload.substring(0, 4);
-    
     String busMsg = payload.substring(5, payload.length());
-    log.debug("=================bus message: " + busMsg);
+    log.debug("================ Bus message: " + busMsg);
     
     if (busMsg.toLowerCase().contains("stop")) {
-      msg.writeAttachment(busMsg.getBytes(StandardCharsets.UTF_8));
       topic = JCSMPFactory.onlyInstance().createTopic("ctrl/bus/" + busId + "/stop");
-      log.debug("=========================Dynamic Topic = " + topic.getName());
+      log.debug("================ Dynamic Topic = " + topic.getName());
 
     } else if (busMsg.toLowerCase().contains("start")) {
-      msg.writeAttachment(busMsg.getBytes(StandardCharsets.UTF_8));
       topic = JCSMPFactory.onlyInstance().createTopic("ctrl/bus/" + busId + "/start");
-      log.debug("=========================Dynamic Topic = " + topic.getName());
+      log.debug("================ Dynamic Topic = " + topic.getName());
     } else {
       topic = JCSMPFactory.onlyInstance().createTopic("comms/bus/" + busId);   
-      log.debug("=========================Dynamic Topic = " + topic.getName());
+      log.debug("================ Dynamic Topic = " + topic.getName());
     }
-    
-    
-    
-    
-    // Add Record Topic,Partition,Offset to Solace Msg as header properties 
-    // in case we need to track offset restart
+    // Also include topic in dynamicDestination header
     SDTMap userHeader = JCSMPFactory.onlyInstance().createMap();
     try {
-      userHeader.putString("k_topic", record.topic());
+      userHeader.putString("k_topic", kafkaTopic);
       userHeader.putInteger("k_partition", record.kafkaPartition());
       userHeader.putLong("k_offset", record.kafkaOffset());
       userHeader.putDestination("dynamicDestination", topic);
@@ -103,17 +90,8 @@ public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor 
       log.info("Received Solace SDTException {}, with the following: {} ", 
           e.getCause(), e.getStackTrace());
     }
-    
-    String kafkaTopic = record.topic();
-    
-    msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
-    
     msg.setProperties(userHeader);
-
-    log.debug("=================bus message: " + busMsg);
-    
     msg.writeAttachment(busMsg.getBytes(StandardCharsets.UTF_8));
-    // TODO: ^ duplicate!
     
     return msg;
   }

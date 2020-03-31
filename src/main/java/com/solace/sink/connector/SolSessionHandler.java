@@ -19,35 +19,32 @@
 
 package com.solace.sink.connector;
 
-import com.solacesystems.jcsmp.InvalidPropertiesException;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
+import com.solacesystems.jcsmp.JCSMPSessionStats;
+import com.solacesystems.jcsmp.statistics.StatType;
 import com.solacesystems.jcsmp.transaction.TransactedSession;
+
+import java.util.Enumeration;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SolSessionCreate {
-  private static final Logger log = LoggerFactory.getLogger(SolSessionCreate.class);
+public class SolSessionHandler {
+  private static final Logger log = LoggerFactory.getLogger(SolSessionHandler.class);
 
-  private SolaceSinkConfig lconfig;
+  private SolaceSinkConnectorConfig lconfig;
 
   final JCSMPProperties properties = new JCSMPProperties();
   final JCSMPChannelProperties chanProperties = new JCSMPChannelProperties();
-  private JCSMPSession session;
-  private TransactedSession txSession;
+  private JCSMPSession session = null;
+  private TransactedSession txSession = null;
 
-  private enum KeyHeader {
-    NONE, DESTINATION, CORRELATION_ID, CORRELATION_ID_AS_BYTES
-  }
-
-  protected KeyHeader keyheader = KeyHeader.NONE;
-
-  public SolSessionCreate(SolaceSinkConfig lconfig) {
+  public SolSessionHandler(SolaceSinkConnectorConfig lconfig) {
     this.lconfig = lconfig;
   }
 
@@ -160,78 +157,55 @@ public class SolSessionCreate {
   }
 
   /**
-   * Connect JCSMPSession.
+   * Create and connect JCSMPSession
+   * @return
+   * @throws JCSMPException 
    */
-  public void connectSession() {
-	  
-    System.setProperty("java.security.auth.login.config",
-        lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_LOGIN_CONFIG));
-    System.setProperty("java.security.krb5.conf",
-        lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_KRB5_CONFIG));
-
-    boolean connected = false;
-    try {
+  public void connectSession() throws JCSMPException {
+      System.setProperty("java.security.auth.login.config",
+                      lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_LOGIN_CONFIG));
+      System.setProperty("java.security.krb5.conf",
+          lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_KRB5_CONFIG));
+      
       session = JCSMPFactory.onlyInstance().createSession(properties, 
           null, new SolSessionEventCallbackHandler());
-      connected = true;
-    } catch (InvalidPropertiesException e) {
-      connected = false;
-      log.info("=============Received Solace exception {}, with the following: {} ", 
-          e.getCause(), e.getStackTrace());
-    }
-    if (connected) {
-      try {
-        session.connect();
+      session.connect();
+  }
 
-        connected = true;
-      } catch (JCSMPException e) {
-        log.info("=============Received Solace exception {}, with the "
-            + "following: {} ", e.getCause(), e.getStackTrace());
-        connected = false;
-      }
-    }
+  /**
+   * Create transacted session 
+   * @return TransactedSession
+   * @throws JCSMPException 
+   */
+  public void createTxSession() throws JCSMPException {
+      txSession = session.createTransactedSession();
+   }
 
-    if (connected && lconfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
-      try {
-        txSession = session.createTransactedSession();
-        log.info("================Transacted Session is Connected");
-      } catch (JCSMPException e) {
-        log.info(
-            "================Transacted Session FAILED to Connect, "
-            + "make sure transacted sessions is enabled for Solace Client");
-        log.info("Received Solace exception {}, with the "
-            + "following: {} ", e.getCause(), e.getStackTrace());
-        connected = false;
-      }
-
-    } else {
-      log.info(
-          "================Transacted Session was not created, "
-          + "either because of failure in creation or no queue consumers registered");
-      txSession = null;
-    }
-
+  public JCSMPSession getSession() {
+    return session;
   }
 
   public TransactedSession getTxSession() {
     return txSession;
   }
 
-  public JCSMPSession getSession() {
-    return session;
+  public void printStats() {
+    if (session != null) {
+      JCSMPSessionStats lastStats = session.getSessionStats();
+      Enumeration<StatType> estats = StatType.elements();
+      while (estats.hasMoreElements()) {
+        StatType statName = estats.nextElement();
+        log.info("\t" + statName.getLabel() + ": " + lastStats.getStat(statName));
+      }
+      log.info("\n");
+    }
   }
-
+  
   /**
    * Shutdown Session.
-   * 
-   * @return boolean of shutdown result
    */
-  public boolean shutdown() {
-
+  public void shutdown() {
     session.closeSession();
-
-    return true;
-
   }
 
 }

@@ -70,7 +70,7 @@ public class TestSolaceConsumer {
         topicSubscriber = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage msg) {
-               logger.info("Message received to topic" + msg.getDestination());
+               logger.info("Message received to topic: " + msg.getDestination());
                solaceReceivedTopicMessages.add(msg);
             }
             @Override

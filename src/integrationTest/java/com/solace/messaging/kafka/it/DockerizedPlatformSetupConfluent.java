@@ -29,9 +29,9 @@ public class DockerizedPlatformSetupConfluent implements MessagingServiceFullLoc
                         .withExposedPorts(28083,5005)
                         .withEnv("CONNECT_REST_PORT", "28083")
 //
-                        // Enable remote debug session at default port 5005
-                        .withEnv("KAFKA_DEBUG", "y")
-                        .withEnv("DEBUG_SUSPEND_FLAG", "y")
+//                        // Enable remote debug session at default port 5005
+//                        .withEnv("KAFKA_DEBUG", "y")
+//                        .withEnv("DEBUG_SUSPEND_FLAG", "y")
 //
                         .withEnv("CONNECT_GROUP_ID", "quickstart-avro")
                         .withEnv("CONNECT_CONFIG_STORAGE_TOPIC", "quickstart-avro-config")

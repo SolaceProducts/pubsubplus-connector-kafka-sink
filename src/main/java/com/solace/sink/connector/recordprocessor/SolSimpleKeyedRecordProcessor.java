@@ -40,7 +40,7 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
     NONE, DESTINATION, CORRELATION_ID, CORRELATION_ID_AS_BYTES
   }
 
-  protected KeyHeader keyheader = KeyHeader.NONE;
+  protected KeyHeader keyheader = KeyHeader.NONE; // default
 
   @Override
   public BytesXMLMessage processRecord(String skey, SinkRecord record) {
@@ -55,20 +55,11 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
     }
 
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
-   
-    Object recordKey = record.key();
-    
-    // Add Record Topic,Partition,Offset to Solace Msg in case we need to track offset restart
-    // limited in Kafka Topic size, replace using SDT below.
-    //String userData = "T:" + record.topic() + ",P:" + record.kafkaPartition()
-    //    + ",O:" + record.kafkaOffset();
-    //msg.setUserData(userData.getBytes(StandardCharsets.UTF_8)); 
-    
-    // Add Record Topic,Partition,Offset to Solace Msg as header properties 
-    // in case we need to track offset restart
+    // Add Record Topic,Partition,Offset to Solace Msg
+    String kafkaTopic = record.topic();
     SDTMap userHeader = JCSMPFactory.onlyInstance().createMap();
     try {
-      userHeader.putString("k_topic", record.topic());
+      userHeader.putString("k_topic", kafkaTopic);
       userHeader.putInteger("k_partition", record.kafkaPartition());
       userHeader.putLong("k_offset", record.kafkaOffset());
     } catch (SDTException e) {
@@ -76,19 +67,15 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
           e.getCause(), e.getStackTrace());
     }
     msg.setProperties(userHeader);
-    
-    String kafkaTopic = record.topic();
-    Schema keyschema = record.keySchema();
-    
     msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
     
-    
+    Object recordKey = record.key();
+    Schema keySchema = record.keySchema();
 
     // If Topic was Keyed, use the key for correlationID
-    if (keyheader != KeyHeader.NONE && keyheader != KeyHeader.DESTINATION) {
-
+    if (keyheader == KeyHeader.CORRELATION_ID || keyheader == KeyHeader.CORRELATION_ID_AS_BYTES) {
       if (recordKey != null) {
-        if (keyschema == null) {
+        if (keySchema == null) {
           log.trace("No schema info {}", recordKey);
           if (recordKey instanceof byte[]) {
             msg.setCorrelationId(new String((byte[]) recordKey, StandardCharsets.UTF_8));
@@ -97,50 +84,61 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessor {
           } else {
             msg.setCorrelationId(recordKey.toString());
           }
-        } else if (keyschema.type() == Schema.Type.BYTES) {
+        } else if (keySchema.type() == Schema.Type.BYTES) {
           if (recordKey instanceof byte[]) {
             msg.setCorrelationId(new String((byte[]) recordKey, StandardCharsets.UTF_8));
           } else if (recordKey instanceof ByteBuffer) {
             msg.setCorrelationId(new String(((ByteBuffer) recordKey).array(), StandardCharsets.UTF_8));
           }
-        } else if (keyschema.type() == Schema.Type.STRING) {
+        } else if (keySchema.type() == Schema.Type.STRING) {
           msg.setCorrelationId((String) recordKey);
+        } else {
+          log.trace("No applicable schema type {}", keySchema.type());
+          // Nothing to do with no applicable schema type
         }
-        // TODO: log no applicable schema
+      } else {
+        // Nothing to do with null recordKey
       }
-
-    } else if (keyheader == KeyHeader.DESTINATION && keyschema.type() == Schema.Type.STRING) {
-      
+    } else if (keyheader == KeyHeader.DESTINATION && keySchema.type() == Schema.Type.STRING) {
         // Destination is already determined by sink settings so set just the correlationId.
         // Receiving app can evaluate it 
         msg.setCorrelationId((String) recordKey);
+    } else {
+      // Do nothing in all other cases
     }
 
     Schema valueSchema = record.valueSchema();
     Object recordValue = record.value();
     // get message body details from record
-    log.debug("Value schema {}", valueSchema);
-    if (recordValue == null) {
+    if (recordValue != null) {
+      if (valueSchema == null) {
+        log.trace("No schema info {}", recordValue);
+        if (recordValue instanceof byte[]) {
+          msg.writeAttachment((byte[]) recordValue);
+        } else if (recordValue instanceof ByteBuffer) {
+          msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
+        } else if (recordValue instanceof String) {
+          msg.writeAttachment(((String) recordValue).getBytes());
+        } else {
+          // Unknown recordValue type
+          msg.reset();
+        }
+      } else if (valueSchema.type() == Schema.Type.BYTES) {
+        if (recordValue instanceof byte[]) {
+          msg.writeAttachment((byte[]) recordValue);
+        } else if (recordValue instanceof ByteBuffer) {
+          msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
+        }
+      } else if (valueSchema.type() == Schema.Type.STRING) {
+        msg.writeAttachment(((String) recordValue).getBytes());
+      } else {
+        // Do nothing in all other cases 
+        msg.reset();
+      }
+    } else {
+      // Invalid message
       msg.reset();
-      return msg;
-    } else if (valueSchema == null) {
-      log.debug("No schema info {}", recordValue);
-      if (recordValue instanceof byte[]) {
-        msg.writeAttachment((byte[]) recordValue);
-
-      } else if (recordValue instanceof ByteBuffer) {
-        msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
-      }
-      // TODO: log nothing found
-    } else if (valueSchema.type() == Schema.Type.BYTES) {
-      if (recordValue instanceof byte[]) {
-        msg.writeAttachment((byte[]) recordValue);
-      } else if (recordValue instanceof ByteBuffer) {
-        msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
-      }
-      // TODO: log nothing found
     }
-    // TODO: log no applicable schema found - Schema.Type.STRING ???
 
     return msg;
   }

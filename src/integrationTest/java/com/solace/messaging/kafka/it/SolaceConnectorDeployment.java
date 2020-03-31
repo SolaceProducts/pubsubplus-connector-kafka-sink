@@ -75,7 +75,6 @@ public class SolaceConnectorDeployment  implements TestConstants {
             config.setProperty("sol.vpn_name", SOL_VPN);
             config.setProperty("topics", kafkaTestTopic);
             config.setProperty("sol.topics", SOL_TOPICS);
-            config.setProperty("sol.queue", SOL_QUEUE);
             config.setProperty("sol.autoflush.size", "1");
             config.setProperty("sol.kafka_message_key", CONN_KAFKA_MSGKEY);
             config.setProperty("value.converter", "org.apache.kafka.connect.converters.ByteArrayConverter");
@@ -104,7 +103,6 @@ public class SolaceConnectorDeployment  implements TestConstants {
             jobject.addProperty("sol.vpn_name", SOL_VPN);
             jobject.addProperty("topics", kafkaTestTopic);
             jobject.addProperty("sol.topics", SOL_TOPICS);
-            jobject.addProperty("sol.queue", SOL_QUEUE);
             jobject.addProperty("sol.autoflush.size", "1");
             jobject.addProperty("sol.message_processor_class", CONN_MSGPROC_CLASS);
             jobject.addProperty("sol.kafka_message_key", CONN_KAFKA_MSGKEY);
