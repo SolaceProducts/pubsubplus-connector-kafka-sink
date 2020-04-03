@@ -38,12 +38,13 @@ public class TestSolaceConsumer {
     private FlowReceiver queueConsumer;
     private String queueName;
 
-    public TestSolaceConsumer(String host, String user, String password, String messagevpn) {
+    public void initialize(String host, String user, String password, String messagevpn) {
+        TestConfigProperties configProps = new TestConfigProperties();
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, host);     // host:port
-        properties.setProperty(JCSMPProperties.USERNAME, user); // client-username
-        properties.setProperty(JCSMPProperties.VPN_NAME,  messagevpn); // message-vpn
-        properties.setProperty(JCSMPProperties.PASSWORD, password); // client-password
+        properties.setProperty(JCSMPProperties.HOST, "tcp://" + configProps.getProperty("sol.host") + ":55555");     // host:port
+        properties.setProperty(JCSMPProperties.USERNAME, configProps.getProperty("sol.username")); // client-username
+        properties.setProperty(JCSMPProperties.VPN_NAME,  configProps.getProperty("sol.vpn_name")); // message-vpn
+        properties.setProperty(JCSMPProperties.PASSWORD, configProps.getProperty("sol.password")); // client-password
         try {
             session =  JCSMPFactory.onlyInstance().createSession(properties);
             session.connect();

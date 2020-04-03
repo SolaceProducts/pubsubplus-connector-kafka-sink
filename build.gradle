@@ -46,14 +46,26 @@ dependencies {
     integrationTestImplementation 'com.google.code.gson:gson:2.3.1'
     integrationTestImplementation 'commons-io:commons-io:2.4'
     integrationTestImplementation 'com.squareup.okhttp3:okhttp:4.4.0'
+    integrationTestImplementation 'org.apache.kafka:kafka-clients:2.4.1'
     compileOnly "org.apache.kafka:connect-api:$kafkaVersion"
     compile "com.solacesystems:sol-jcsmp:$solaceJavaAPIVersion"
+}
+
+task('prepDistForIntegrationTesting') {
+    dependsOn assembleDist
+    doLast {
+        copy { 
+            from zipTree(file('build/distributions').listFiles().findAll {it.name.endsWith('.zip')}[0])
+ //           into (file('src/integrationTest/resources'))
+            into (file('build/resources/integrationTest'))
+        }
+    }
 }
 
 project.integrationTest {
     useJUnitPlatform()
     outputs.upToDateWhen { false }
-    dependsOn assembleDist
+    dependsOn prepDistForIntegrationTesting
 }
 
 distributions {
