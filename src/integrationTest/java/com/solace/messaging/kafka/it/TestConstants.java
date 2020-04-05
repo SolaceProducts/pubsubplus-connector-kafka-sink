@@ -14,10 +14,10 @@ public interface TestConstants {
     public static final int GUARANTEED_MESSAGING_HTTP_HEALTH_CHECK_PORT = 5550;
 
     public static final String CONNECTORSOURCE = "build/distributions/pubsubplus-connector-kafka-sink.zip";
-    public static final String CONNECTORLIB = "pubsubplus-connector-kafka-sink/lib";
-    public static final String CONNECTORDESTINATION = "src/integrationTest/resources/";
-    public static final String CONNECTORPROPERTIESFILE = CONNECTORDESTINATION+"pubsubplus-connector-kafka-sink/etc/solace_sink.properties";
-    public static final String CONNECTORJSONPROPERTIESFILE = CONNECTORDESTINATION+"pubsubplus-connector-kafka-sink/etc/solace_sink_properties.json";
+
+    public static final String UNZIPPEDCONNECTORDESTINATION = "src/integrationTest/resources";
+    public static final String CONNECTORPROPERTIESFILE = "etc/solace_sink.properties";
+    public static final String CONNECTORJSONPROPERTIESFILE = "etc/solace_sink_properties.json";
     
     public static final String SOL_ADMINUSER_NAME = "default";
     public static final String SOL_ADMINUSER_PW = "default";
