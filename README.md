@@ -35,7 +35,7 @@ Unlike many other message brokers, the Solace PubSub+ Event Broker supports tran
 
 As the following diagram shows, any Kafka topic (keyed or non-keyed) sink record is instantly available for consumption by a consumer that uses one of the Solace supported open standards languages or transport protocols.
 
-![Messaging Transformations](/doc/images/KS.png)
+![Messaging Transformations](/doc/images/KSink.png)
 
 #### Tying Kafka into the PubSub+ Event Mesh
 
@@ -83,7 +83,7 @@ a) Locate the following connection information of your messaging service for the
 b) edit the PubSub+ Sink Connector properties file located at `connectors/pubsubplus-connector-kafka-sink-<version>/etc/solace_sink.properties`  updating following respective parameters so the connector can access the PubSub+ event broker:
 * `sol.username`, `sol.password`, `sol.vpn_name`, `sol.host`;
 
-c) Note the configured source and destination information: the `sol.topics` parameter specifies the ingress topic on PubSub+ (`sinktest`) and `kafka.topic` is the Kafka destination topic (`test`), created in Step 1.
+c) Note the configured source and destination information: `topics` is the Kafka source topic (`test`), created in Step 1 and the `sol.topics` parameter specifies the destination topic on PubSub+ (`sinktest`).
 
 **Step 5**: Start the connector in standalone mode. In a command line session run:
 ```sh
@@ -96,18 +96,17 @@ After startup, logs shall eventually contain following line:
 ================Session is Connected
 ```
 
-**Step 6**: Start to watch messages arriving to Kafka. Get back to the Kafka [tutorial](//kafka.apache.org/quickstart#quickstart_consume) and start a consumer on the `test` topic.
-
-**Step 7**: Demo time!
-To generate an event into PubSub+, we will use the "Try Me!" test service of the browser-based administration console to publish test messages to the `sinktest` topic. Behind the scenes, "Try Me!" is using the WebSocket API from JavaScript code.
+**Step 6**: To watch messages arriving into PubSub+, we will use the "Try Me!" test service of the browser-based administration console to subscribe to messages to the `sinktest` topic. Behind the scenes, "Try Me!" is using the WebSocket API from JavaScript code.
 
 * If you are using PubSub+ Cloud for your messaging service follow the [Trying Out Your Messaging Service guide](//docs.solace.com/Solace-Cloud/ggs_tryme.htm).
 
 * If using an existing event broker, log in to its [PubSub+ Manager admin console](//docs.solace.com/Solace-PubSub-Manager/PubSub-Manager-Overview.htm#mc-main-content) and follow the [How to Send and Receive Test Messages guide](//docs.solace.com/Solace-PubSub-Manager/PubSub-Manager-Overview.htm#Test-Messages).
 
-In both cases ensure to set the topic to `sinktest`, which the connector is listening to.
+In both cases ensure to set the topic to `sinktest`, which the connector is publishing to.
 
-The Kafka consumer from Step 6 should now display the new message arriving to Kafka through the PubSub+ Kafka Sink Connector:
+**Step 7**: Demo time! Start to write messages to the Kafka "test" topic. Get back to the Kafka [tutorial](//kafka.apache.org/quickstart#quickstart_send), type and send `Hello world!`.
+
+The "Try Me!" consumer from Step 6 should now display the new message arriving to PubSub+ through the PubSub+ Kafka Sink Connector:
 ```
 Hello world!
 ```
@@ -122,7 +121,7 @@ Refer to the in-line documentation of the [sample PubSub+ Kafka Sink Connector p
 
 ### Deployment
 
-The PubSub+ Sink Connector deployment has been tested on Apache Kafka 2.12 and Confluent Kafka 5.4 platforms. The Kafka software is typically placed under the root directory: `/opt/<provider>/<kafka or confluent-version>`.
+The PubSub+ Sink Connector deployment has been tested on Apache Kafka 2.4 and Confluent Kafka 5.4 platforms. The Kafka software is typically placed under the root directory: `/opt/<provider>/<kafka or confluent-version>`.
 
 Kafka distributions may be available as install bundles, Docker images, Kubernetes deployments, etc. They all support Kafka Connect which includes the scripts, tools and sample properties for Kafka connectors.
 
@@ -132,7 +131,7 @@ Kafka provides two options for connector deployment: [standalone mode and distri
 
 * In distributed mode, Kafka configuration is provided in `connect-distributed.properties` and passed to the `connect-distributed` Kafka shell script, which is started on each worker node. The `group.id` parameter identifies worker nodes belonging the same group. The script starts a REST server on each worker node and PubSub+ Sink Connector configuration is passed to any one of the worker nodes in the group through REST requests in JSON format.
 
-To deploy the Connector, for each target machine [download]( https://solacedev.github.io/pubsubplus-connector-kafka-sink/downloads ), and expand the PubSub+ Sink Connector into a directory and ensure the `plugin.path` parameter value in the `connect-*.properties` includes the absolute path to that directory. Note that Kafka Connect, i.e. the `connect-standalone` or `connect-distributed` Kafka shell scripts must be restarted or equivalent action from a Kafka console is required if the PubSub+ Sink Connector deployment is updated.
+To deploy the Connector, for each target machine [download]( //solacedev.github.io/pubsubplus-connector-kafka-sink/downloads), and expand the PubSub+ Sink Connector into a directory and ensure the `plugin.path` parameter value in the `connect-*.properties` includes the absolute path to that directory. Note that Kafka Connect, i.e. the `connect-standalone` or `connect-distributed` Kafka shell scripts must be restarted or equivalent action from a Kafka console is required if the PubSub+ Sink Connector deployment is updated.
 
 Some PubSub+ Sink Connector configurations may require the deployment of additional specific files like keystores, truststores, Kerberos config files, etc. It does not matter where these additional files are located, but they must be available on all Kafka Connect Cluster nodes and placed in the same location on all the nodes because they are referenced by absolute location and configured only once through one REST request for all.
 
@@ -147,8 +146,8 @@ In this case the IP address is one of the nodes running the distributed mode wor
 
 ```
   {
-    "class": "com.solace.sink.connector.SolaceSourceConnector",
-    "type": "source",
+    "class": "com.solace.sink.connector.SolaceSinkConnector",
+    "type": "sink",
     "version": "2.0.0"
   },
 ```
