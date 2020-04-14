@@ -16,9 +16,9 @@ Contents:
   * [User Guide](#user-guide)
     + [Deployment](#deployment)
     + [Troubleshooting](#troubleshooting)
-    + [Message processors](#message-processors)
-    + [Performance considerations](#performance-considerations)
-    + [Security Considerations](#security-considerations)  
+    + [Event Processing](#event-processing)
+    + [Performance and reliability considerations](#performance-and-reliability-considerations)
+    + [Security Considerations](#security-considerations)
   * [Developers Guide](#developers-guide)
 
 ## Overview
@@ -194,77 +194,88 @@ Ensure to set it back to INFO or WARN for production.
 
 ### Event Processing
 
-#### Message processors
+#### Record processors
 
-There are many ways to map PubSub+ messages to Kafka topic, partition, key and values, depending on the application behind the events.
+There are many ways to map topic, partition, key and values of Kafka records to PubSub+ messages, depending on the application.
 
-The PubSub+ Sink Connector comes with two sample message processors that can be used as is, or as a starting point to develop a customized message processor.
+The PubSub+ Sink Connector comes with three sample record processors that can be used as is, or as a starting point to develop a customized record processor.
 
-* **SimpleMessageProcessor** - which takes the PubSub+ message as a binary payload and creates a Kafka Sink record with a Binary Schema for the value (from the PubSub+ message payload).
-* **SampleKeyedMessageProcessor** - A more complex sample that allows the flexibility of changing the source record Key Schema and which value from the PubSub+ message to use as a key. The option of no key in the record is also possible.
+* **SolSimpleRecordProcessor** - takes the Kafka sink record as a binary payload with a binary schema for the value, which becomes the PubSub+ message payload. The key and value schema can be changed via the configuration file.
 
-The desired message processor is loaded at runtime based on the configuration of the JSON or properties configuration file, for example:
+* **SolSimpleKeyedRecordProcessor** - a more complex sample that allows the flexibility of mapping the sink record key to PubSub+ message contents. In this sample, the kafka key is set as a Correlation ID in the Solace messages. The option of no key in the record is also possible.
+
+* **SolDynamicDestinationRecordProcessor** - by default, the Sink Connector will send messages to destinations (Topic or Queues) defined in the configuration file. This example shows how to route each Kafka record to a potentially different PubSub+ topic based on the record binary payload. In this imaginary transportation example the records are distributed to buses listening to topics like `ctrl/bus/<busId>/<command>`, where the <busId> is encoded in the first 4 bytes in the record value and <command> in the rest. Note that `sol.dynamic_destination=true` must be specified in the configuration file to enable this mode (otherwise destinations are taken from sol.topics or sol.queue).
+
+In all processors the original Kafka topic, partition and offset are included for reference in the PubSub+ Message as UserData in the Solace message header, sent as a "User Property Map". The message dump is similar to:
 ```
-sol.message_processor_class=com.solace.source.connector.msgprocessors.SolSampleSimpleMessageProcessor
+Destination:                            Topic 'sinktest'
+AppMessageType:                         ResendOfKafkaTopic: test
+Priority:                               4
+Class Of Service:                       USER_COS_1
+DeliveryMode:                           DIRECT
+Message Id:                             4
+User Property Map:                      3 entries
+  Key 'k_offset' (Long): 0
+  Key 'k_topic' (String): test
+  Key 'k_partition' (Integer): 0
+
+Binary Attachment:                      len=11
+  48 65 6c 6c 6f 20 57 6f    72 6c 64                   Hello.World
 ```
 
-It is possible to create more custom message processors based on you Kafka record requirements for keying and/or value serialization and the desired format of the PubSub+ event message. Simply add the new message processor classes to the project. The desired message processor is installed at run time based on the configuration file. 
+The desired record processor is loaded at runtime based on the configuration of the JSON or properties configuration file, for example:
+```
+sol.record_processor_class=com.solace.sink.connector.recordprocessor.SolSimpleRecordProcessor
+```
 
-Refer to the [Developers Guide](#developers-guide) for more information about building the Sink Connector and extending message processors.
+It is possible to create more custom record processors based on you Kafka record requirements for keying and/or value serialization and the desired format of the PubSub+ event message. Simply add the new record processor classes to the project. The desired record processor is installed at run time based on the configuration file. 
+
+Refer to the [Developers Guide](#developers-guide) for more information about building the Sink Connector and extending record processors.
+
+#### Message Replay
+
+By default, the Sink Connector will start sending events based on the last Kafka topic offset that was flushed before the connector was stopped. It is possible to use the Sink Connector to replay messages from the Kafka topic.
+
+Adding a configuration entry allows the Sink Connector to start processing from an offset position that is different from the last offset that was stored before the connector was stopped:
+```
+sol.kafka_replay_offset=<offset>
+```
+
+A value of 0 will result in the replay of the entire Kafka Topic. A positive value will result in the replay from that offset value for the Kafka Topic. The same offset value will be used against all active partitions for that Kafka Topic.
 
 ### Performance and reliability considerations
 
-#### Ingesting from PubSub+ Topics
+#### Sending to PubSub+ Topics
 
-When ingesting from PubSub+ Topics, the event broker uses "best effort" to deliver the events to the Sink Connector. If the connector is down, or messages are constantly generated at a rate faster than can be written to Kafka, there will be potential for data loss. If Kafka is configured for it's highest throughput, it also is susceptible for loss and obviously, cannot add records if the Kafka broker is unavailable.
+It is recommended to use PubSub+ Topics if high throughput is required and the Kafka Topic is configured for high performance. Message duplication and loss will mimic the underlying reliability and QoS configured for the Kafka topic.
 
-When a Kafka Topic is configured for high throughput the use of topics to receive data event messages is acceptable and recommended.
+#### Sending to PubSub+ Queue
 
-The connector can ingest using a list of topic subscriptions, where each can be a  [wild-card](//docs.solace.com/PubSub-Basics/Wildcard-Charaters-Topic-Subs.htm) subscription.
+When Kafka records reliability is critical, it is recommended to mimic this reliability and configure the Sink Connector to send records to the Event Mesh using PubSub+ queues at the cost of reduced throughput.
 
-#### Ingesting from PubSub+ Queue
+A PubSub+ queue guarantees order of delivery, provides High Availability and Disaster Recovery (depending on the setup of the PubSub+ brokers) and provides an acknowledgment to the connector when the event is stored in all HA and DR members and flushed to disk. This is a higher guarantee than is provided by Kafka even for Kafka idempotent delivery.
 
-It is also possible to have the PubSub+ Sink Connector to attract data events from a  PubSub+ Queue. A queue guarantees order of delivery, provides High Availability and Disaster Recovery (depending on the setup of the PubSub+ brokers) and provides an acknowledgment to the message producer (in this case the PubSub+ event producer application) when the event is stored in all HA and DR members and flushed to disk. This is a higher guarantee than is provided by Kafka even for Kafka idempotent delivery.
+The connector is using local transactions to deliver to the queue by default - the transaction will be committed if messages are flushed by Kafka Connect (see below how to tune flush interval) or the outstanding messages size reaches the `sol.autoflush.size` (default 200) configuration.
 
-When a Kafka Topic is configured with it's highest quality-of-service with respect to record loss or duplication, it results in a large reduction in record processing throughput. However, in some application requirements this QoS is required. In this case, the PubSub+ Sink Connector should use Queue for the consumption of events from the Event Mesh.
-
-Note that one connector can only ingest from one queue.
+Note that generally one connector can only send to one queue.
 
 ##### Recovery from Connect or Kafka Broker Fail
 
-When the connector is consuming from a PubSub+ queue, a timed Kafka Connect process commits the source records and offset to disk on the Kafka broker and calls the connector to acknowledge the messages that were processed so far, which removes these event messages from the event broker queue. 
+The Kafka Connect API automatically keeps track of the offset that the Sink Connector has read and processed. If the connector stops or is restarted, the Connect API will start passing records to the connector based on the last saved offset.
 
-If Kafka Connect or the Kafka broker goes down, unacknowledged messages are not lost, they will be retransmitted as soon as Connect or Kafka are restarted. It is important to note that while Connect or the Kafka Broker are off-line, the PubSub+ queue will continue to add event messages, so there will be no loss of new data from the PubSub+ Event Mesh.
+The time interval to save the last offset can be tuned via the `offset.flush.interval.ms` parameter (default 60,000 ms) in the worker's `connect-distributed.properties` configuration file.
 
-The commit time interval is configurable via the `offset.flush.interval.ms` parameter (default 60,000 ms) in the worker's `connect-distributed.properties` configuration file. If high message rate is expected the parameter shall be tuned, taking into consideration that each task (in case of [Multiple Workers](#multiple-workers)) shall not allow excessively large (for example, 10,000 or more) amount of unacknowledged messages.
-
-##### Queue Handling of Data Bursts
-
-If the throughput through the Connect is not high enough, and messages are starting to accumulate in the PubSub+ Queue, scaling of the Connector is recommended as discussed [below](#multiple-workers).
-
-If the Sink Connector has not been scaled to a required level to deal with bursts, the Queue can act as a "shock absorber" to deal with micro-bursts or sustained periods of heavy event generation in the Event Mesh so data events will no be lost due to an unforeseen event.
-
-#### Ingesting from a Queue configured with Topic-To-Queue Mapping
-
-The Topic-to-Queue Mapping is the simple process of configuring a PubSub+ Queue to attract PubSub+ Topic data event. These data events will immediately be available via the queue with a protection against record loss and "shock absorber" advantage that use of a Queue provides.
-
-Topic-to-Queue Mapping, just like any PubSub+ topic subscriptions, allow wild-card subscriptions to multiple topics.
+Recovery may result in duplicate PubSub+ events published to the Event Mesh. As described [above](#record-processors), the Solace message header "User Property Map" contains all the Kafka unique record information which enables identifying and filtering duplicates.
 
 #### Multiple Workers
 
-The PubSub+ broker supports far greater throughput than can be afforded through a single instance of the Connect API. The Kafka Broker can also process records at a rate far greater than available through a single instance of the Connector. 
-Therefore, multiple instances of the Sink Connector will increase throughput from the Kafka broker to the Solace PubSub+ broker.
+The Sink Connector will scale when more performance is required. Throughput is limited by a single instance of the Connect API - the Kafka Broker can produce records and the Solace PubSub+ broker can consume messages at a far greater rate.
 
 Multiple connector tasks are automatically deployed and spread across all available Connect workers simply by indicating the number of desired tasks in the connector configuration file.
 
-PubSub+ queue or topic subscriptions must be configured properly to support distributed consumption, so events are automatically load balanced between the multiple workers:
+There are no special configuration requirements for PubSub+ queue or topics to support scaling.
 
-* If the ingestion source is a Queue, it must be configured as [non-exclusive](//docs.solace.com/PubSub-Basics/Endpoints.htm#Queue_Access_Types), which permits multiple consumers to receive messages in a round-robin fashion.
-
-* By the nature of Topics, if there are multiple subscribers to a topic, 
-all subscribers will receive all of the same topic data event messages. Load balancing can be achieved by applying [Shared Subscriptions](//docs.solace.com/PubSub-Basics/Direct-Messages.htm#Shared), which ensures that messages are delivered to only one active subscriber at a time. 
-
-Note that Shared Subscriptions may need to be [administratively enabled](//docs.solace.com/Configuring-and-Managing/Configuring-Client-Profiles.htm#Allowing-Shared-Subs) in the event broker Client Profile. Also note that Shared Subscriptions are not available on older versions of the event broker - the deprecated [DTO (Deliver-To-One) feature](//docs.solace.com/Configuring-and-Managing/DTO.htm) can be used instead.
+On the Kafka side the Connect API will automatically use a Kafka consumer group to allow moving of records from multiple topic partitions in parallel.
 
 ### Security Considerations
 
@@ -322,17 +333,18 @@ This will create artifacts in the `build` directory, including the deployable pa
 
 An integration test suite is also included, which spins up a Docker-based deployment environment that includes a PubSub+ event broker, Zookeeper, Kafka broker, Kafka Connect. It deploys the connector to Kafka Connect and runs end-to-end tests.
 ```
-gradlew clean integrationTest --tests com.solace.messaging.kafka.it.SourceConnectorIT
+gradlew clean integrationTest --tests com.solace.messaging.kafka.it.SinkConnectorIT
 ```
 
-### Build a new message processor
+### Build a new record processor
 
-The processing of the Solace message to create a Kafka source record is handled by an interface definition defined in [`SolaceMessageProcessorIF.java`](/src/main/java/com/solace/source/connector/SolMessageProcessorIF.java). This is a simple interface that is used to create the Kafka source records from the PubSub+ messages. There are two examples included of classes that implement this interface:
+The processing of a Kafka record to create a PubSub+ message is handled by an interface definition defined in [`SolRecordProcessorIF.java`](/src/main/java/com/solace/sink/connector/SolRecordProcessorIF.java). This is a simple interface that is used to create the Kafka source records from the PubSub+ messages. There are three examples included of classes that implement this interface:
 
-* [SolSampleSimpleMessageProcessor](/src/main/java/com/solace/sink/connector/msgprocessors/SolSampleSimpleMessageProcessor.java)
-* [SolaceSampleKeyedMessageProcessor](/src/main/java/com/sink/source/connector/msgprocessors/SolaceSampleKeyedMessageProcessor.java)
+* [SolSimpleRecordProcessor](/src/main/java/com/solace/sink/connector/msgprocessors/SolSimpleRecordProcessor.java)
+* [SolSimpleKeyedRecordProcessor](/src/main/java/com/solace/sink/connector/msgprocessors/SolSimpleKeyedRecordProcessor.java)
+* [SolDynamicDestinationRecordProcessor](/src/main/java/com/solace/sink/connector/msgprocessors/SolDynamicDestinationRecordProcessor.java)
 
-These can be used as starting points for custom message processor implementations.
+These can be used as starting points for custom record processor implementations.
 
 More information on Kafka sink connector development can be found here:
 - [Apache Kafka Connect](https://kafka.apache.org/documentation/)

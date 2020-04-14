@@ -23,7 +23,7 @@ import com.solacesystems.jcsmp.BytesXMLMessage;
 
 import org.apache.kafka.connect.sink.SinkRecord;
 
-public interface SolRecordProcessor {
+public interface SolRecordProcessorIF {
 
   BytesXMLMessage processRecord(String skey, SinkRecord record);
 

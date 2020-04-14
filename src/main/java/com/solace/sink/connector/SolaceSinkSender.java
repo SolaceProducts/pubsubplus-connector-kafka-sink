@@ -50,7 +50,7 @@ public class SolaceSinkSender {
   private Queue solQueue = null;
   private boolean useTxforQueue = false;
   private Class<?> cprocessor;
-  private SolRecordProcessor processor;
+  private SolRecordProcessorIF processor;
   private String kafkaKey;
   private AtomicInteger txMsgCounter = new AtomicInteger();
 
@@ -70,7 +70,7 @@ public class SolaceSinkSender {
     topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
     cprocessor = (this.sconfig.getClass(SolaceSinkConstants.SOL_RECORD_PROCESSOR));
     try {
-      processor = (SolRecordProcessor) cprocessor.newInstance();
+      processor = (SolRecordProcessorIF) cprocessor.newInstance();
     } catch (InstantiationException | IllegalAccessException e) {
       log.info("================ Received exception while creating record processing class {}, "
           + "with the following: {} ",

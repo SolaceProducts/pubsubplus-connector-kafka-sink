@@ -19,7 +19,7 @@
 
 package com.solace.sink.connector.recordprocessor;
 
-import com.solace.sink.connector.SolRecordProcessor;
+import com.solace.sink.connector.SolRecordProcessorIF;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.SDTException;
@@ -31,7 +31,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SolSimpleRecordProcessor implements SolRecordProcessor {
+public class SolSimpleRecordProcessor implements SolRecordProcessorIF {
   private static final Logger log = LoggerFactory.getLogger(SolSimpleRecordProcessor.class);
 
   @Override
