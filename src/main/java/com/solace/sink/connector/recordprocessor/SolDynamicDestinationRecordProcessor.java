@@ -19,7 +19,7 @@
 
 package com.solace.sink.connector.recordprocessor;
 
-import com.solace.sink.connector.SolRecordProcessor;
+import com.solace.sink.connector.SolRecordProcessorIF;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * It also requires the configuration property "sol.dynamic_destination=true" to be set. 
  */
 
-public class SolDynamicDestinationRecordProcessor implements SolRecordProcessor {
+public class SolDynamicDestinationRecordProcessor implements SolRecordProcessorIF {
   private static final Logger log = 
       LoggerFactory.getLogger(SolDynamicDestinationRecordProcessor.class);
 

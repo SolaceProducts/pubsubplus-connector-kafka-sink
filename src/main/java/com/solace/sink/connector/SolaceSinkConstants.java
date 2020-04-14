@@ -71,7 +71,7 @@ public class SolaceSinkConstants {
   public static final String SOL_SSL_VALIDATE_CERTIFICATE = "sol.ssl_validate_certificate";
   public static final String SOL_SSL_VALIDATE_CERTIFICATE_DATE = "sol.ssl_validate_certicate_date";
   public static final String SOL_SSL_TRUST_STORE = "sol.ssl_trust_store";
-  public static final String SOL_SSL_TRUST_STORE_PASSWORD = "sol.ssl_trust_store_pasword";
+  public static final String SOL_SSL_TRUST_STORE_PASSWORD = "sol.ssl_trust_store_password";
   public static final String SOL_SSL_TRUST_STORE_FORMAT = "sol.ssl_trust_store_format";
   public static final String SOL_SSL_TRUSTED_COMMON_NAME_LIST = "sol.ssl_trusted_common_name_list";
   public static final String SOL_SSL_KEY_STORE = "sol.ssl_key_store";
@@ -110,7 +110,7 @@ public class SolaceSinkConstants {
 
   // Low Importance Persistent Message Properties
   public static final String SOL_SUB_ACK_WINDOW_SIZE = "sol.sub_ack_window_size";
-  public static final String SOL_PUB_ACK_WINDOW_SIZE = "sol.sub_ack_window_size";
+  public static final String SOL_PUB_ACK_WINDOW_SIZE = "sol.pub_ack_window_size";
   public static final String SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE = "sol.autoflush.size";
   public static final String SOL_SUB_ACK_TIME = "sol.sub_ack_time";
   public static final String SOL_PUB_ACK_TIME = "sol.pub_ack_time";

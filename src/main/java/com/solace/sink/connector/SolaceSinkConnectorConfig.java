@@ -61,7 +61,7 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOl_QUEUE, 
             Type.STRING, null, Importance.MEDIUM, "Solace queue to consume from")
         .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR, 
-            Type.CLASS, SolRecordProcessor.class, Importance.HIGH,
+            Type.CLASS, SolRecordProcessorIF.class, Importance.HIGH,
             "default Solace message processor to use against Kafka Sink Records")
         .define(SolaceSinkConstants.SOL_LOCALHOST, Type.STRING, null, Importance.LOW,
             "The hostname or IP address of the machine on which the application "
