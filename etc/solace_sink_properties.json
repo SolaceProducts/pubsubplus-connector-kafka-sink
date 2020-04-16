@@ -12,6 +12,6 @@
 		"sol.password": "default",
 		"sol.vpn_name": "default",
 		"sol.topics": "sinktest",
-		"sol.record_processor_class": "com.solace.sink.connector.recordprocessor.SolSimpleRecordProcessor",
+		"sol.record_processor_class": "com.solace.sink.connector.recordprocessor.SolSimpleRecordProcessor"
 	}
 }
