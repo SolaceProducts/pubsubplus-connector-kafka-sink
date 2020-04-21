@@ -354,6 +354,10 @@ More information on Kafka sink connector development can be found here:
 - [Apache Kafka Connect](https://kafka.apache.org/documentation/)
 - [Confluent Kafka Connect](https://docs.confluent.io/current/connect/index.html)
 
+## Additional Information
+
+For additional information, use cases and explanatory videos, please visit the [PubSub+/Kafka Integration Guide](https://docs.solace.com/Developer-Tools/Integration-Guides/Kafka-Connect.htm).
+
 ## Contributing
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
