@@ -4,7 +4,7 @@
 
 This project provides a Kafka to Solace PubSub+ Event Broker [Sink Connector](//kafka.apache.org/documentation.html#connect_concepts) (adapter) that makes use of the [Kafka Connect API](//kafka.apache.org/documentation/#connect).
 
-**Note**: there is also a PubSub+ Kafka Source Connector available from the [PubSub+ Connector Kafka Source]() GitHub repository.
+**Note**: there is also a PubSub+ Kafka Source Connector available from the [PubSub+ Connector Kafka Source](https://github.com/SolaceProducts/pubsubplus-connector-kafka-source) GitHub repository.
 
 Contents:
 
@@ -55,7 +55,7 @@ PubSub+ brokers support bi-directional messaging and the unique addressing of mi
 
 ## Downloads
 
-The PubSub+ Kafka Sink Connector is available as a ZIP or TAR package from the [downloads](//solacedev.github.io/pubsubplus-connector-kafka-sink/downloads/) page.
+The PubSub+ Kafka Sink Connector is available as a ZIP or TAR package from the [downloads](//solaceproducts.github.io/pubsubplus-connector-kafka-sink/downloads/) page.
 
 The package includes the jar libraries, documentation with license information, and sample property files. Download and extract it into a directory that is on the `plugin.path` of your `connect-standalone` or `connect-distributed` properties file.
 
@@ -72,7 +72,7 @@ It builds on the open source [Apache Kafka Quickstart tutorial](//kafka.apache.o
 1. Install Kafka. Follow the [Apache tutorial](//kafka.apache.org/quickstart#quickstart_download) to download the Kafka release code, start the Zookeeper and Kafka servers in separate command line sessions, then create a topic named `test` and verify it exists.
 
 2. Install PubSub+ Sink Connector. Designate and create a directory for the PubSub+ Sink Connector (here, we assume it is named `connectors`). Edit the `config/connect-standalone.properties` file, and ensure the `plugin.path` parameter value includes the absolute path of the `connectors` directory.
-[Download]( https://solacedev.github.io/pubsubplus-connector-kafka-sink/downloads ) and extract the PubSub+ Sink Connector into the `connectors` directory.
+[Download]( https://solaceproducts.github.io/pubsubplus-connector-kafka-sink/downloads ) and extract the PubSub+ Sink Connector into the `connectors` directory.
 
 3. Acquire access to a PubSub+ message broker. If you don't already have one available, the easiest option is to get a free-tier service in a few minutes in [PubSub+ Cloud](//solace.com/try-it-now/), following the instructions in [Creating Your First Messaging Service](https://docs.solace.com/Solace-Cloud/ggs_signup.htm). 
 
@@ -137,7 +137,7 @@ Kafka provides two options for connector deployment: [standalone mode and distri
 
 * In distributed mode, the Kafka configuration is provided in `connect-distributed.properties` and passed to the `connect-distributed` Kafka shell script, which is started on each worker node. The `group.id` parameter identifies worker nodes belonging the same group. The script starts a REST server on each worker node and PubSub+ Sink Connector configuration is passed to any one of the worker nodes in the group through REST requests in JSON format.
 
-To deploy the Connector, for each target machine, [download]( https://solacedev.github.io/pubsubplus-connector-kafka-sink/downloads) and extract the PubSub+ Sink Connector into a directory and ensure the `plugin.path` parameter value in the `connect-*.properties` includes the absolute path to that directory. Note that Kafka Connect, i.e., the `connect-standalone` or `connect-distributed` Kafka shell scripts, must be restarted (or an equivalent action from a Kafka console is required) if the PubSub+ Sink Connector deployment is updated.
+To deploy the Connector, for each target machine, [download]( https://solaceproducts.github.io/pubsubplus-connector-kafka-sink/downloads) and extract the PubSub+ Sink Connector into a directory and ensure the `plugin.path` parameter value in the `connect-*.properties` includes the absolute path to that directory. Note that Kafka Connect, i.e., the `connect-standalone` or `connect-distributed` Kafka shell scripts, must be restarted (or an equivalent action from a Kafka console is required) if the PubSub+ Sink Connector deployment is updated.
 
 Some PubSub+ Sink Connector configurations may require the deployment of additional specific files, like keystores, truststores, Kerberos config files, etc. It does not matter where these additional files are located, but they must be available on all Kafka Connect Cluster nodes and placed in the same location on all the nodes because they are referenced by absolute location and configured only once through one REST request for all.
 
