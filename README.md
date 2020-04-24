@@ -152,7 +152,7 @@ In this case the IP address is one of the nodes running the distributed mode wor
 
 ```
   {
-    "class": "com.solace.sink.connector.SolaceSinkConnector",
+    "class": "com.solace.connector.kafka.connect.sink.SolaceSinkConnector",
     "type": "sink",
     "version": "2.0.0"
   },
@@ -231,7 +231,7 @@ Binary Attachment:                      len=11
 
 The desired record processor is loaded at runtime based on the configuration of the JSON or properties configuration file, for example:
 ```
-sol.record_processor_class=com.solace.sink.connector.recordprocessor.SolSimpleRecordProcessor
+sol.record_processor_class=com.solace.connector.kafka.connect.sink.recordprocessor.SolSimpleRecordProcessor
 ```
 
 It is possible to create more custom record processors based on you Kafka record requirements for keying and/or value serialization and the desired format of the PubSub+ event message. Simply add the new record processor classes to the project. The desired record processor is installed at run time based on the configuration file. 
@@ -337,16 +337,16 @@ This script creates artifacts in the `build` directory, including the deployable
 
 An integration test suite is also included, which spins up a Docker-based deployment environment that includes a PubSub+ event broker, Zookeeper, Kafka broker, Kafka Connect. It deploys the connector to Kafka Connect and runs end-to-end tests.
 ```
-gradlew clean integrationTest --tests com.solace.messaging.kafka.it.SinkConnectorIT
+gradlew clean integrationTest --tests com.solace.connector.kafka.connect.sink.it.SinkConnectorIT
 ```
 
 ### Build a New Record Processor
 
-The processing of a Kafka record to create a PubSub+ message is handled by an interface defined in [`SolRecordProcessorIF.java`](/src/main/java/com/solace/sink/connector/SolRecordProcessorIF.java). This is a simple interface that creates the Kafka source records from the PubSub+ messages. This project includes three examples of classes that implement this interface:
+The processing of a Kafka record to create a PubSub+ message is handled by an interface defined in [`SolRecordProcessorIF.java`](/src/main/java/com/solace/connector/kafka/connect/sink/SolRecordProcessorIF.java). This is a simple interface that creates the Kafka source records from the PubSub+ messages. This project includes three examples of classes that implement this interface:
 
-* [SolSimpleRecordProcessor](/src/main/java/com/solace/sink/connector/msgprocessors/SolSimpleRecordProcessor.java)
-* [SolSimpleKeyedRecordProcessor](/src/main/java/com/solace/sink/connector/msgprocessors/SolSimpleKeyedRecordProcessor.java)
-* [SolDynamicDestinationRecordProcessor](/src/main/java/com/solace/sink/connector/msgprocessors/SolDynamicDestinationRecordProcessor.java)
+* [SolSimpleRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolSimpleRecordProcessor.java)
+* [SolSimpleKeyedRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolSimpleKeyedRecordProcessor.java)
+* [SolDynamicDestinationRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolDynamicDestinationRecordProcessor.java)
 
 You can use these examples as starting points for implementing your own custom record processors.
 
