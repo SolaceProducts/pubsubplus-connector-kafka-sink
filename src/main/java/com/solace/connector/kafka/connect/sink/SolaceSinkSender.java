@@ -116,10 +116,18 @@ public class SolaceSinkSender {
    * @param record Kafka Records
    */
   public void sendRecord(SinkRecord record) {
-    message = processor.processRecord(kafkaKey, record);
-    log.trace("================ Processed record details, topic: {}, Partition: {}, "
-        + "Offset: {}", record.topic(),
-        record.kafkaPartition(), record.kafkaOffset());
+    try {
+      message = processor.processRecord(kafkaKey, record);
+      log.trace("================ Processed record details, topic: {}, Partition: {}, "
+          + "Offset: {}", record.topic(),
+          record.kafkaPartition(), record.kafkaOffset());
+    } catch (Exception e) {
+      log.info(
+          "================ Encountered exception in record processing....discarded."
+          + " Cause: {}, Stacktrace: {} ",
+          e.getCause(), e.getStackTrace());
+      return;
+    }
 
     if (message.getAttachmentContentLength() == 0 || message.getAttachmentByteBuffer() == null) {
       log.info("================ Received record that had no data....discarded");
