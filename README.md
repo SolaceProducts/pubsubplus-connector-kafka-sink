@@ -1,10 +1,10 @@
 [![Build Status](https://travis-ci.org/SolaceProducts/pubsubplus-connector-kafka-sink.svg?branch=master)](https://travis-ci.org/SolaceProducts/pubsubplus-connector-kafka-sink)
 
-# PubSub+ Connector Kafka Sink
+# Solace PubSub+ Connector for Kafka: Sink
 
 This project provides a Kafka to Solace PubSub+ Event Broker [Sink Connector](//kafka.apache.org/documentation.html#connect_concepts) (adapter) that makes use of the [Kafka Connect API](//kafka.apache.org/documentation/#connect).
 
-**Note**: there is also a PubSub+ Kafka Source Connector available from the [PubSub+ Connector Kafka Source](https://github.com/SolaceProducts/pubsubplus-connector-kafka-source) GitHub repository.
+**Note**: there is also a PubSub+ Kafka Source Connector available from the [Solace PubSub+ Connector for Kafka: Source](https://github.com/SolaceProducts/pubsubplus-connector-kafka-source) GitHub repository.
 
 Contents:
 
