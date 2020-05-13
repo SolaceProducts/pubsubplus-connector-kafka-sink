@@ -1,4 +1,4 @@
-# Solace PubSub+ Connector Kafka Sink
+# Solace PubSub+ Connector for Kafka: Sink
 
 This package provides a Solace PubSub+ Event Broker to Kafka Sink Connector. 
 
