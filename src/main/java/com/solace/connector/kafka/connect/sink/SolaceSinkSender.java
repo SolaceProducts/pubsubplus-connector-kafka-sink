@@ -31,9 +31,13 @@ import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,19 +57,24 @@ public class SolaceSinkSender {
   private SolRecordProcessorIF processor;
   private String kafkaKey;
   private AtomicInteger txMsgCounter = new AtomicInteger();
-
+  private SolaceSinkTask sinkTask;
+  private Map<TopicPartition, OffsetAndMetadata> offsets
+      = new HashMap<TopicPartition, OffsetAndMetadata>();
+  
   /**
    * Class that sends Solace Messages from Kafka Records.
    * @param sconfig JCSMP Configuration
    * @param sessionHandler SolSessionHandler
-   * @param useTxforQueue 
+   * @param useTxforQueue
+   * @param sinkTask Connector Sink Task
    * @throws JCSMPException 
    */
   public SolaceSinkSender(SolaceSinkConnectorConfig sconfig, SolSessionHandler sessionHandler, 
-      boolean useTxforQueue) throws JCSMPException {
+      boolean useTxforQueue, SolaceSinkTask sinkTask) throws JCSMPException {
     this.sconfig = sconfig;
     this.sessionHandler = sessionHandler;
     this.useTxforQueue = useTxforQueue;
+    this.sinkTask = sinkTask;
     kafkaKey = sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
     topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
     cprocessor = (this.sconfig.getClass(SolaceSinkConstants.SOL_RECORD_PROCESSOR));
@@ -118,6 +127,8 @@ public class SolaceSinkSender {
   public void sendRecord(SinkRecord record) {
     try {
       message = processor.processRecord(kafkaKey, record);
+      offsets.put(new TopicPartition(record.topic(), record.kafkaPartition()),
+          new OffsetAndMetadata(record.kafkaOffset()));
       log.trace("================ Processed record details, topic: {}, Partition: {}, "
           + "Offset: {}", record.topic(),
           record.kafkaPartition(), record.kafkaOffset());
@@ -189,7 +200,7 @@ public class SolaceSinkSender {
     // Solace limits transaction size to 255 messages so need to force commit
     if ( useTxforQueue && txMsgCounter.get() > sconfig.getInt(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE)-1 ) {
       log.debug("================ Queue transaction autoflush size reached, flushing offsets from connector");
-      commit();
+      sinkTask.flush(offsets);
     }
   }
   
