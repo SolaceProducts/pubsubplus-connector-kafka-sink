@@ -74,7 +74,7 @@ public class SolaceSinkTask extends SinkTask {
     }
     
     try {
-      solSender = new SolaceSinkSender(connectorConfig, solSessionHandler, useTxforQueue);
+      solSender = new SolaceSinkSender(connectorConfig, solSessionHandler, useTxforQueue, this);
       if (connectorConfig.getString(SolaceSinkConstants.SOL_TOPICS) != null) {
         solSender.setupDestinationTopics();
       }
