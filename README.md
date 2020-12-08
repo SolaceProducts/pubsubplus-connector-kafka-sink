@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/SolaceProducts/pubsubplus-connector-kafka-sink.svg?branch=master)](https://travis-ci.org/SolaceProducts/pubsubplus-connector-kafka-sink)
+[![Actions Status](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/workflows/build/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions?query=workflow%3Abuild+branch%3Amaster)
 
 # Solace PubSub+ Connector for Kafka: Sink
 
