@@ -1,6 +1,8 @@
 package com.solace.connector.kafka.connect.sink.it;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -10,6 +12,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 
+@Disabled
 public class DockerizedPlatformSetupConfluent implements MessagingServiceFullLocalSetupConfluent {
 
     @DisplayName("Local MessagingService connection tests")
@@ -46,7 +49,7 @@ public class DockerizedPlatformSetupConfluent implements MessagingServiceFullLoc
                                                         + ":8081")
                         .withEnv("CONNECT_INTERNAL_KEY_CONVERTER", "org.apache.kafka.connect.json.JsonConverter")
                         .withEnv("CONNECT_INTERNAL_VALUE_CONVERTER", "org.apache.kafka.connect.json.JsonConverter")
-//                        
+//
                         .withEnv("CONNECT_REST_ADVERTISED_HOST_NAME", "localhost")
                         .withEnv("CONNECT_LOG4J_ROOT_LOGLEVEL", "INFO")
                         .withEnv("CONNECT_PLUGIN_PATH", "/usr/share/java,/etc/kafka-connect/jars")
@@ -55,6 +58,7 @@ public class DockerizedPlatformSetupConfluent implements MessagingServiceFullLoc
 //                        .waitingFor( Wait.forHealthcheck() );
                         .waitingFor( Wait.forLogMessage(".*Kafka Connect started.*", 1) );
 
+        @Disabled
         @DisplayName("Setup the dockerized platform")
         @Test
         void setupDockerizedPlatformTest() {

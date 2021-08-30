@@ -337,7 +337,7 @@ This script creates artifacts in the `build` directory, including the deployable
 
 An integration test suite is also included, which spins up a Docker-based deployment environment that includes a PubSub+ event broker, Zookeeper, Kafka broker, Kafka Connect. It deploys the connector to Kafka Connect and runs end-to-end tests.
 ```
-gradlew clean integrationTest --tests com.solace.connector.kafka.connect.sink.it.SinkConnectorIT
+gradlew clean test integrationTest
 ```
 
 ### Build a New Record Processor
