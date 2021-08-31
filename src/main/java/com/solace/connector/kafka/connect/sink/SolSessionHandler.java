@@ -53,13 +53,13 @@ public class SolSessionHandler {
    */
   public void configureSession() {
     // Required Properties
-    properties.setProperty(JCSMPProperties.USERNAME, 
+    properties.setProperty(JCSMPProperties.USERNAME,
         lconfig.getString(SolaceSinkConstants.SOL_USERNAME));
-    properties.setProperty(JCSMPProperties.PASSWORD, 
-        lconfig.getString(SolaceSinkConstants.SOL_PASSWORD));
-    properties.setProperty(JCSMPProperties.VPN_NAME, 
+    properties.setProperty(JCSMPProperties.PASSWORD,
+        lconfig.getPassword(SolaceSinkConstants.SOL_PASSWORD).value());
+    properties.setProperty(JCSMPProperties.VPN_NAME,
         lconfig.getString(SolaceSinkConstants.SOL_VPN_NAME));
-    properties.setProperty(JCSMPProperties.HOST, 
+    properties.setProperty(JCSMPProperties.HOST,
         lconfig.getString(SolaceSinkConstants.SOL_HOST));
 
     // Channel Properties
@@ -71,7 +71,7 @@ public class SolSessionHandler {
         .getInt(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectRetries));
     chanProperties.setReconnectRetries(lconfig
         .getInt(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetries));
- 
+
     chanProperties.setConnectRetriesPerHost(
         lconfig.getInt(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectRetriesPerHost));
     chanProperties.setReconnectRetryWaitInMillis(
@@ -111,7 +111,7 @@ public class SolSessionHandler {
         lconfig.getBoolean(SolaceSinkConstants.SOL_IGNORE_DUPLICATE_SUBSCRIPTION_ERROR));
     properties.setBooleanProperty(JCSMPProperties.IGNORE_SUBSCRIPTION_NOT_FOUND_ERROR,
         lconfig.getBoolean(SolaceSinkConstants.SOL_IGNORE_SUBSCRIPTION_NOT_FOUND_ERROR));
-    properties.setBooleanProperty(JCSMPProperties.NO_LOCAL, 
+    properties.setBooleanProperty(JCSMPProperties.NO_LOCAL,
         lconfig.getBoolean(SolaceSinkConstants.SOL_NO_LOCAL));
     properties.setProperty(JCSMPProperties.AUTHENTICATION_SCHEME,
         lconfig.getString(SolaceSinkConstants.SOl_AUTHENTICATION_SCHEME));
@@ -135,47 +135,47 @@ public class SolSessionHandler {
         lconfig.getBoolean(SolaceSinkConstants.SOL_SSL_VALIDATE_CERTIFICATE));
     properties.setProperty(JCSMPProperties.SSL_VALIDATE_CERTIFICATE_DATE,
         lconfig.getBoolean(SolaceSinkConstants.SOL_SSL_VALIDATE_CERTIFICATE_DATE));
-    properties.setProperty(JCSMPProperties.SSL_TRUST_STORE, 
+    properties.setProperty(JCSMPProperties.SSL_TRUST_STORE,
         lconfig.getString(SolaceSinkConstants.SOL_SSL_TRUST_STORE));
     properties.setProperty(JCSMPProperties.SSL_TRUST_STORE_PASSWORD,
-        lconfig.getString(SolaceSinkConstants.SOL_SSL_TRUST_STORE_PASSWORD));
+        lconfig.getPassword(SolaceSinkConstants.SOL_SSL_TRUST_STORE_PASSWORD).value());
     properties.setProperty(JCSMPProperties.SSL_TRUST_STORE_FORMAT,
         lconfig.getString(SolaceSinkConstants.SOL_SSL_TRUST_STORE_FORMAT));
     properties.setProperty(JCSMPProperties.SSL_TRUSTED_COMMON_NAME_LIST,
         lconfig.getString(SolaceSinkConstants.SOL_SSL_TRUSTED_COMMON_NAME_LIST));
-    properties.setProperty(JCSMPProperties.SSL_KEY_STORE, 
+    properties.setProperty(JCSMPProperties.SSL_KEY_STORE,
         lconfig.getString(SolaceSinkConstants.SOL_SSL_KEY_STORE));
     properties.setProperty(JCSMPProperties.SSL_KEY_STORE_PASSWORD,
-        lconfig.getString(SolaceSinkConstants.SOL_SSL_KEY_STORE_PASSWORD));
+        lconfig.getPassword(SolaceSinkConstants.SOL_SSL_KEY_STORE_PASSWORD).value());
     properties.setProperty(JCSMPProperties.SSL_KEY_STORE_FORMAT,
         lconfig.getString(SolaceSinkConstants.SOL_SSL_KEY_STORE_FORMAT));
     properties.setProperty(JCSMPProperties.SSL_KEY_STORE_NORMALIZED_FORMAT,
         lconfig.getString(SolaceSinkConstants.SOL_SSL_KEY_STORE_NORMALIZED_FORMAT));
     properties.setProperty(JCSMPProperties.SSL_PRIVATE_KEY_PASSWORD,
-        lconfig.getString(SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_PASSWORD));
+        lconfig.getPassword(SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_PASSWORD).value());
 
   }
 
   /**
    * Create and connect JCSMPSession
    * @return
-   * @throws JCSMPException 
+   * @throws JCSMPException
    */
   public void connectSession() throws JCSMPException {
       System.setProperty("java.security.auth.login.config",
                       lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_LOGIN_CONFIG));
       System.setProperty("java.security.krb5.conf",
           lconfig.getString(SolaceSinkConstants.SOL_KERBEROS_KRB5_CONFIG));
-      
-      session = JCSMPFactory.onlyInstance().createSession(properties, 
+
+      session = JCSMPFactory.onlyInstance().createSession(properties,
           null, new SolSessionEventCallbackHandler());
       session.connect();
   }
 
   /**
-   * Create transacted session 
+   * Create transacted session
    * @return TransactedSession
-   * @throws JCSMPException 
+   * @throws JCSMPException
    */
   public void createTxSession() throws JCSMPException {
       txSession = session.createTransactedSession();
@@ -200,7 +200,7 @@ public class SolSessionHandler {
       log.info("\n");
     }
   }
-  
+
   /**
    * Shutdown Session.
    */
