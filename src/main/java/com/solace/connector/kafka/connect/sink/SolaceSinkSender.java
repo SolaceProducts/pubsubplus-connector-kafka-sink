@@ -168,7 +168,7 @@ public class SolaceSinkSender {
       // Process when Dynamic destination is not set
       if (solQueue != null) {
         try {
-          message.setDeliveryMode(DeliveryMode.PERSISTENT);
+          message.setDeliveryMode(sconfig.getMessageDeliveryMode().orElse(DeliveryMode.PERSISTENT));
           queueProducer.send(message, solQueue);
           if (useTxforQueue) {
             txMsgCounter.getAndIncrement();
@@ -181,7 +181,7 @@ public class SolaceSinkSender {
         }
       }
       if (topics.size() != 0 && message.getDestination() == null) {
-        message.setDeliveryMode(DeliveryMode.DIRECT);
+        message.setDeliveryMode(sconfig.getMessageDeliveryMode().orElse(DeliveryMode.DIRECT));
         int count = 0;
         while (topics.size() > count) {
           try {

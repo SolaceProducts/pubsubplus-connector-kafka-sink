@@ -39,6 +39,8 @@ public class SolaceSinkConstants {
   public static final String SOL_TOPICS = "sol.topics";
   public static final String SOl_QUEUE = "sol.queue";
 
+  public static final String SOL_MESSAGE_DELIVERY_MODE = "sol.message.delivery.mode";
+
   // Low Importance General Properties
   public static final String SOl_SESSION_NAME = "sol.session_name";
   public static final String SOL_LOCALHOST = "sol.localhost";
