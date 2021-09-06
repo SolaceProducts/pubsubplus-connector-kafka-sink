@@ -21,10 +21,26 @@ package com.solace.connector.kafka.connect.sink;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 
+import org.apache.kafka.common.Configurable;
 import org.apache.kafka.connect.sink.SinkRecord;
 
-public interface SolRecordProcessorIF {
+import java.util.Map;
 
-  BytesXMLMessage processRecord(String skey, SinkRecord record);
+public interface SolRecordProcessorIF extends Configurable {
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  default void configure(final Map<String, ?> configs) { }
+
+  /**
+   * Converts a record consumed from Kafka into a Solace {@link BytesXMLMessage}.
+   *
+   * @param skey    the Kafka record-key.
+   * @param record  the Kafka record-value.
+   * @return        a new {@link BytesXMLMessage}.
+   */
+  BytesXMLMessage processRecord(final String skey, final SinkRecord record);
 
 }
