@@ -205,7 +205,9 @@ public class SolSessionHandler {
    * Shutdown Session.
    */
   public void shutdown() {
-    session.closeSession();
+    if (session != null) {
+      session.closeSession();
+    }
   }
 
 }

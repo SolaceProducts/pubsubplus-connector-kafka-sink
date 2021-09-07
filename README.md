@@ -318,27 +318,37 @@ Kerberos has some very specific requirements to operate correctly. Some addition
 
 ## Developers Guide
 
-### Build and Test the Project
+### Build the Project
 
 JDK 8 or higher is required for this project.
 
 First, clone this GitHub repo:
-```
+```shell
 git clone https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git
 cd pubsubplus-connector-kafka-sink
 ```
 
 Then run the build script:
-```
-gradlew clean build
+```shell
+./gradlew clean build
 ```
 
 This script creates artifacts in the `build` directory, including the deployable packaged PubSub+ Sink Connector archives under `build\distributions`.
 
+### Test the Project
+
 An integration test suite is also included, which spins up a Docker-based deployment environment that includes a PubSub+ event broker, Zookeeper, Kafka broker, Kafka Connect. It deploys the connector to Kafka Connect and runs end-to-end tests.
-```
-gradlew clean test integrationTest
-```
+
+1. Install the test support module:
+    ```shell
+    cd solace-integration-test-support
+    ./mvnw clean install -DskipTests
+    cd ..
+    ```
+2. Run the tests:
+    ```shell
+    ./gradlew clean test integrationTest
+    ```
 
 ### Build a New Record Processor
 
