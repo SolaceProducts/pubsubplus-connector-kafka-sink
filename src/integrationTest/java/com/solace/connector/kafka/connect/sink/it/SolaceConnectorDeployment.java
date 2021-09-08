@@ -4,10 +4,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
+
+import okhttp3.ResponseBody;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.FileBasedConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -31,6 +35,8 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 public class SolaceConnectorDeployment implements TestConstants {
 
@@ -142,6 +148,26 @@ public class SolaceConnectorDeployment implements TestConstants {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
+  }
+
+  public JsonObject getConnectorStatus() {
+    Request request = new Request.Builder()
+            .url("http://" + connectorAddress + "/connectors/solaceSinkConnector/status").build();
+    return assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+      while (true) {
+        try (Response response = client.newCall(request).execute()) {
+          if (!response.isSuccessful()) {
+            continue;
+          }
+
+          return Optional.ofNullable(response.body())
+                  .map(ResponseBody::charStream)
+                  .map(s -> new JsonParser().parse(s))
+                  .map(JsonElement::getAsJsonObject)
+                  .orElseGet(JsonObject::new);
+        }
+      }
+    });
   }
 
 }
