@@ -1,5 +1,7 @@
 package com.solace.connector.kafka.connect.sink.it;
 
+import com.solace.connector.kafka.connect.sink.recordprocessor.SolSimpleRecordProcessor;
+
 public interface TestConstants {
 
     public static final String PUBSUB_TAG = "latest";
@@ -18,7 +20,7 @@ public interface TestConstants {
     public static final String UNZIPPEDCONNECTORDESTINATION = "src/integrationTest/resources";
     public static final String CONNECTORPROPERTIESFILE = "etc/solace_sink.properties";
     public static final String CONNECTORJSONPROPERTIESFILE = "etc/solace_sink_properties.json";
-    
+
     public static final String SOL_ADMINUSER_NAME = "default";
     public static final String SOL_ADMINUSER_PW = "default";
     public static final String SOL_VPN = "default";
@@ -26,6 +28,6 @@ public interface TestConstants {
     public static final String SOL_ROOT_TOPIC = "pubsubplus-test-topic-sink";
     public static final String SOL_TOPICS = "pubsubplus-test-topic-sink";
     public static final String SOL_QUEUE = "pubsubplus-test-queue-sink";
-    public static final String CONN_MSGPROC_CLASS = "com.solace.sink.connector.recordprocessor.SolSimpleRecordProcessor";
+    public static final String CONN_MSGPROC_CLASS = SolSimpleRecordProcessor.class.getName();
     public static final String CONN_KAFKA_MSGKEY = "DESTINATION";
 }

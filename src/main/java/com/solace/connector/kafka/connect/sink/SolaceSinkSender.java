@@ -53,23 +53,22 @@ public class SolaceSinkSender {
   private List<Topic> topics = new ArrayList<Topic>();
   private Queue solQueue = null;
   private boolean useTxforQueue = false;
-  private Class<?> cprocessor;
   private SolRecordProcessorIF processor;
   private String kafkaKey;
   private AtomicInteger txMsgCounter = new AtomicInteger();
   private SolaceSinkTask sinkTask;
   private Map<TopicPartition, OffsetAndMetadata> offsets
       = new HashMap<TopicPartition, OffsetAndMetadata>();
-  
+
   /**
    * Class that sends Solace Messages from Kafka Records.
    * @param sconfig JCSMP Configuration
    * @param sessionHandler SolSessionHandler
    * @param useTxforQueue
    * @param sinkTask Connector Sink Task
-   * @throws JCSMPException 
+   * @throws JCSMPException
    */
-  public SolaceSinkSender(SolaceSinkConnectorConfig sconfig, SolSessionHandler sessionHandler, 
+  public SolaceSinkSender(SolaceSinkConnectorConfig sconfig, SolSessionHandler sessionHandler,
       boolean useTxforQueue, SolaceSinkTask sinkTask) throws JCSMPException {
     this.sconfig = sconfig;
     this.sessionHandler = sessionHandler;
@@ -77,14 +76,7 @@ public class SolaceSinkSender {
     this.sinkTask = sinkTask;
     kafkaKey = sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
     topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
-    cprocessor = (this.sconfig.getClass(SolaceSinkConstants.SOL_RECORD_PROCESSOR));
-    try {
-      processor = (SolRecordProcessorIF) cprocessor.newInstance();
-    } catch (InstantiationException | IllegalAccessException e) {
-      log.info("================ Received exception while creating record processing class {}, "
-          + "with the following: {} ",
-          e.getCause(), e.getStackTrace());
-    }
+    processor = this.sconfig.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);
   }
 
   /**
@@ -99,7 +91,7 @@ public class SolaceSinkSender {
       counter++;
     }
   }
-  
+
   /**
    * Generate PubSub queue
    */
@@ -196,14 +188,14 @@ public class SolaceSinkSender {
         }
       }
     }
-    
+
     // Solace limits transaction size to 255 messages so need to force commit
     if ( useTxforQueue && txMsgCounter.get() > sconfig.getInt(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE)-1 ) {
       log.debug("================ Queue transaction autoflush size reached, flushing offsets from connector");
       sinkTask.flush(offsets);
     }
   }
-  
+
   /**
    * Commit Solace and Kafka records.
    * @return Boolean Status
@@ -215,11 +207,11 @@ public class SolaceSinkSender {
         sessionHandler.getTxSession().commit();
         commited = true;
         txMsgCounter.set(0);
-        log.debug("Comitted Solace records for transaction with status: {}", 
+        log.debug("Comitted Solace records for transaction with status: {}",
             sessionHandler.getTxSession().getStatus().name());
       }
     } catch (JCSMPException e) {
-      log.info("Received Solace TX exception {}, with the following: {} ", 
+      log.info("Received Solace TX exception {}, with the following: {} ",
           e.getCause(), e.getStackTrace());
       log.info("The TX error could be due to using dynamic destinations and "
           + "  \"sol.dynamic_destination=true\" was not set in the configuration ");
