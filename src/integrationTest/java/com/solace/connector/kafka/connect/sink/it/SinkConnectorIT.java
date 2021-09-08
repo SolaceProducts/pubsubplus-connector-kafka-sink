@@ -1,9 +1,16 @@
 package com.solace.connector.kafka.connect.sink.it;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.JCSMPException;
+import com.solacesystems.jcsmp.SDTException;
+import com.solacesystems.jcsmp.SDTMap;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,19 +20,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
-import com.solacesystems.jcsmp.BytesXMLMessage;
-import com.solacesystems.jcsmp.JCSMPException;
-import com.solacesystems.jcsmp.SDTException;
-import com.solacesystems.jcsmp.SDTMap;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
-
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 public class SinkConnectorIT extends DockerizedPlatformSetupApache implements TestConstants {
 
@@ -36,7 +44,7 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
     static TestSolaceConsumer solaceConsumer = new TestSolaceConsumer();
     // Used to request additional verification types
     static enum AdditionalCheck { ATTACHMENTBYTEBUFFER, CORRELATIONID }
-    
+
     ////////////////////////////////////////////////////
     // Main setup/teardown
 
@@ -64,11 +72,11 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
         solaceConsumer.stop();
     }
 
-    
-    
+
+
     ////////////////////////////////////////////////////
     // Test types
-    
+
     void messageToKafkaTest(String expectedSolaceQueue, String[] expectedSolaceTopics, String kafkaKey, String kafkaValue,
                     Map<AdditionalCheck, String> additionalChecks) {
         try {
@@ -76,14 +84,14 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
             // TODO: fix possible concurrency issue with cleaning/wring the queue later
             TestSolaceConsumer.solaceReceivedQueueMessages.clear();
             TestSolaceConsumer.solaceReceivedTopicMessages.clear();
-            
+
             // Received messages
             List<BytesXMLMessage> receivedMessages = new ArrayList<>();
-            
+
             // Send Kafka message
             RecordMetadata metadata = kafkaProducer.sendMessageToKafka(kafkaKey, kafkaValue);
             assertNotNull(metadata);
-            
+
             // Wait for PubSub+ to report messages - populate queue and topics if provided
             if (expectedSolaceQueue != null) {
                 BytesXMLMessage queueMessage = TestSolaceConsumer.solaceReceivedQueueMessages.poll(5,TimeUnit.SECONDS);
@@ -111,7 +119,7 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                 if (!topicFound) fail("Nothing was delivered to topic " + topicname);
             }
             // check message contents
-            for (BytesXMLMessage message : receivedMessages) { 
+            for (BytesXMLMessage message : receivedMessages) {
                 SDTMap userHeader = message.getProperties();
                 assert(userHeader.getString("k_topic").contentEquals(metadata.topic()));
                 assert(userHeader.getString("k_partition").contentEquals(Long.toString(metadata.partition())));
@@ -131,24 +139,24 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                     }
                 }
             }
-            
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (SDTException e) {
             e.printStackTrace();
         }
     }
-    
+
     ////////////////////////////////////////////////////
     // Scenarios
-    
+
     @DisplayName("Sink SimpleMessageProcessor tests")
     @Nested
     @TestInstance(Lifecycle.PER_CLASS)
     class SinkConnectorSimpleMessageProcessorTests {
-        
+
         String topics[] = {SOL_ROOT_TOPIC+"/TestTopic1/SubTopic", SOL_ROOT_TOPIC+"/TestTopic2/SubTopic"};
-        
+
         @BeforeAll
         void setUp() {
             Properties prop = new Properties();
@@ -170,15 +178,15 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                             ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, "Hello TextMessageToTopicTest world!"));
         }
     }
-    
-    
+
+
     @DisplayName("Sink KeyedMessageProcessor-NONE tests")
     @Nested
     @TestInstance(Lifecycle.PER_CLASS)
     class SinkConnectorNoneKeyedMessageProcessorTests {
-        
+
         String topics[] = {SOL_ROOT_TOPIC+"/TestTopic1/SubTopic", SOL_ROOT_TOPIC+"/TestTopic2/SubTopic"};
-        
+
         @BeforeAll
         void setUp() {
             Properties prop = new Properties();
@@ -201,15 +209,15 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                             ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, "Hello TextMessageToTopicTest world!"));
         }
     }
-    
+
 
     @DisplayName("Sink KeyedMessageProcessor-DESTINATION tests")
     @Nested
     @TestInstance(Lifecycle.PER_CLASS)
     class SinkConnectorDestinationKeyedMessageProcessorTests {
-        
+
         String topics[] = {SOL_ROOT_TOPIC+"/TestTopic1/SubTopic", SOL_ROOT_TOPIC+"/TestTopic2/SubTopic"};
-        
+
         @BeforeAll
         void setUp() {
             Properties prop = new Properties();
@@ -233,15 +241,15 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                                             AdditionalCheck.CORRELATIONID, "Destination"));
         }
     }
-    
+
 
     @DisplayName("Sink KeyedMessageProcessor-CORRELATION_ID tests")
     @Nested
     @TestInstance(Lifecycle.PER_CLASS)
     class SinkConnectorCorrelationIdKeyedMessageProcessorTests {
-        
+
         String topics[] = {SOL_ROOT_TOPIC+"/TestTopic1/SubTopic", SOL_ROOT_TOPIC+"/TestTopic2/SubTopic"};
-        
+
         @BeforeAll
         void setUp() {
             Properties prop = new Properties();
@@ -265,15 +273,15 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                                             AdditionalCheck.CORRELATIONID, "TestCorrelationId"));
         }
     }
-    
+
 
     @DisplayName("Sink KeyedMessageProcessor-CORRELATION_ID_AS_BYTES tests")
     @Nested
     @TestInstance(Lifecycle.PER_CLASS)
     class SinkConnectorCorrelationIdAsBytesKeyedMessageProcessorTests {
-        
+
         String topics[] = {SOL_ROOT_TOPIC+"/TestTopic1/SubTopic", SOL_ROOT_TOPIC+"/TestTopic2/SubTopic"};
-        
+
         @BeforeAll
         void setUp() {
             Properties prop = new Properties();
@@ -297,15 +305,15 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                                             AdditionalCheck.CORRELATIONID, "TestCorrelationId"));
         }
     }
-    
+
 
     @DisplayName("Sink DynamicDestinationMessageProcessor tests")
     @Nested
     @TestInstance(Lifecycle.PER_CLASS)
     class SinkDynamicDestinationMessageProcessorMessageProcessorTests {
-        
+
         String topics[] = {SOL_ROOT_TOPIC+"/TestTopic1/SubTopic", SOL_ROOT_TOPIC+"/TestTopic2/SubTopic"};
-        
+
         @BeforeAll
         void setUp() {
             Properties prop = new Properties();
@@ -351,6 +359,30 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                             "ignore", "1234:other",
                             // additional checks with expected values
                             ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, "other"));
+        }
+    }
+
+    @DisplayName("Solace connector provisioning tests")
+    @Nested
+    @TestInstance(Lifecycle.PER_CLASS)
+    class SolaceConnectorProvisioningTests {
+        private final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+        @Test
+        void testFailPubSubConnection() {
+            Properties prop = new Properties();
+            prop.setProperty("sol.vpn_name", RandomStringUtils.randomAlphanumeric(10));
+            connectorDeployment.startConnector(prop);
+            AtomicReference<JsonObject> connectorStatus = new AtomicReference<>(new JsonObject());
+            assertTimeoutPreemptively(Duration.ofMinutes(1), () -> {
+                JsonObject taskStatus;
+                do {
+                    JsonObject status = connectorDeployment.getConnectorStatus();
+                    connectorStatus.set(status);
+                    taskStatus = status.getAsJsonArray("tasks").get(0).getAsJsonObject();
+                } while (!taskStatus.get("state").getAsString().equals("FAILED"));
+                assertThat(taskStatus.get("trace").getAsString(), containsString("Message VPN Not Allowed"));
+            }, () -> "Timed out waiting for connector to fail: " + GSON.toJson(connectorStatus.get()));
         }
     }
 
