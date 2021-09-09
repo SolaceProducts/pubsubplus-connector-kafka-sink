@@ -28,7 +28,13 @@ testSets {
     integrationTest
 }
 
+test {
+    useJUnit()
+}
+
 dependencies {
+    testImplementation 'junit:junit:4.12'
+    testImplementation group: 'org.mockito', name: 'mockito-all', version: '1.10.19'
     integrationTestImplementation 'junit:junit:4.12'
     integrationTestImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
     integrationTestImplementation 'org.junit.jupiter:junit-jupiter-engine:5.7.1'

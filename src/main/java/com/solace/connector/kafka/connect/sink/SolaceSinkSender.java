@@ -30,10 +30,8 @@ import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -145,6 +143,8 @@ public class SolaceSinkSender {
       return;
     }
 
+    mayEnrichUserPropertiesWithKafkaRecordHeaders(record, message);
+
     if (sconfig.getBoolean(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION)) {
       // Process use Dynamic destination from SolRecordProcessor
       SDTMap userMap = message.getProperties();
@@ -203,7 +203,28 @@ public class SolaceSinkSender {
       sinkTask.flush(offsets);
     }
   }
-  
+
+  /**
+   * Visible for testing.
+   */
+  void mayEnrichUserPropertiesWithKafkaRecordHeaders(final SinkRecord record,
+                                                     final BytesXMLMessage message) {
+    if (sconfig.isEmitKafkaRecordHeadersEnabled() && !record.headers().isEmpty()) {
+      final SDTMap userMap = Optional
+              .ofNullable(message.getProperties())
+              .orElseGet(JCSMPFactory.onlyInstance()::createMap);
+      record.headers().forEach(header -> {
+        try {
+          userMap.putObject(header.key(), header.value());
+        } catch (SDTException e) {
+          // Re-throw the exception because there is nothing else to do - usually that exception should not happen.
+          throw new RuntimeException("Failed to add object message property from kafka record-header", e);
+        }
+      });
+      message.setProperties(userMap);
+    }
+  }
+
   /**
    * Commit Solace and Kafka records.
    * @return Boolean Status
