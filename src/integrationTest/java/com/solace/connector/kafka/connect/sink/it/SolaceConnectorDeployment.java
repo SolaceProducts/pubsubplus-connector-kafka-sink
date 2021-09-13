@@ -48,15 +48,17 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public void waitForConnectorRestIFUp() {
     Request request = new Request.Builder().url("http://" + connectorAddress + "/connector-plugins").build();
-    Response response = null;
+    boolean success = false;
     do {
       try {
-        Thread.sleep(1000l);
-        response = client.newCall(request).execute();
+        Thread.sleep(1000L);
+        try (Response response = client.newCall(request).execute()) {
+          success = response.isSuccessful();
+        }
       } catch (IOException | InterruptedException e) {
         // Continue looping
       }
-    } while (response == null || !response.isSuccessful());
+    } while (!success);
   }
 
   public void provisionKafkaTestTopic() {
@@ -118,28 +120,30 @@ public class SolaceConnectorDeployment implements TestConstants {
       // check presence of Solace plugin: curl
       // http://18.218.82.209:8083/connector-plugins | jq
       Request request = new Request.Builder().url("http://" + connectorAddress + "/connector-plugins").build();
-      Response response;
-      response = client.newCall(request).execute();
-      assert (response.isSuccessful());
-      String results = response.body().string();
-      logger.info("Available connector plugins: " + results);
-      assert (results.contains("solace"));
+      try (Response response = client.newCall(request).execute()) {
+        assert (response.isSuccessful());
+        String results = response.body().string();
+        logger.info("Available connector plugins: " + results);
+        assert (results.contains("solace"));
+      }
 
       // Delete a running connector, if any
       Request deleterequest = new Request.Builder()
           .url("http://" + connectorAddress + "/connectors/solaceSinkConnector").delete().build();
-      Response deleteresponse = client.newCall(deleterequest).execute();
-      logger.info("Delete response: " + deleteresponse);
+      try (Response deleteresponse = client.newCall(deleterequest).execute()) {
+        logger.info("Delete response: " + deleteresponse);
+      }
 
       // configure plugin: curl -X POST -H "Content-Type: application/json" -d
       // @solace_source_properties.json http://18.218.82.209:8083/connectors
       Request configrequest = new Request.Builder().url("http://" + connectorAddress + "/connectors")
           .post(RequestBody.create(configJson, MediaType.parse("application/json"))).build();
-      Response configresponse = client.newCall(configrequest).execute();
-      // if (!configresponse.isSuccessful()) throw new IOException("Unexpected code "
-      // + configresponse);
-      String configresults = configresponse.body().string();
-      logger.info("Connector config results: " + configresults);
+      try (Response configresponse = client.newCall(configrequest).execute()) {
+        // if (!configresponse.isSuccessful()) throw new IOException("Unexpected code "
+        // + configresponse);
+        String configresults = configresponse.body().string();
+        logger.info("Connector config results: " + configresults);
+      }
       // check success
       Thread.sleep(5000); // Give some time to start
     } catch (IOException e) {

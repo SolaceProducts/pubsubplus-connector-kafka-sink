@@ -30,17 +30,19 @@ import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.errors.RetriableException;
+import org.apache.kafka.connect.sink.SinkRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.connect.sink.SinkRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class SolaceSinkSender {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkSender.class);
@@ -150,11 +152,12 @@ public class SolaceSinkSender {
       }
       try {
         topicProducer.send(message, dest);
+      } catch (IllegalArgumentException e) {
+        throw new ConnectException(String.format("Received exception while sending message to topic %s",
+                dest != null ? dest.getName() : null), e);
       } catch (JCSMPException e) {
-        log.info(
-            "================ Received exception while sending message to topic {}:  "
-            + "{}, with the following: {} ",
-            dest.getName(), e.getCause(), e.getStackTrace());
+        throw new RetriableException(String.format("Received exception while sending message to topic %s",
+                dest != null ? dest.getName() : null), e);
       }
     } else {
       // Process when Dynamic destination is not set
@@ -166,10 +169,12 @@ public class SolaceSinkSender {
             txMsgCounter.getAndIncrement();
             log.trace("================ Count of TX message is now: {}", txMsgCounter.get());
           }
+        } catch (IllegalArgumentException e) {
+          throw new ConnectException(String.format("Received exception while sending message to queue %s",
+                  solQueue.getName()), e);
         } catch (JCSMPException e) {
-          log.info("================ Received exception while sending message to queue {}:  "
-              + "{}, with the following: {} ",
-              solQueue.getName(), e.getCause(), e.getStackTrace());
+          throw new RetriableException(String.format("Received exception while sending message to queue %s",
+                  solQueue.getName()), e);
         }
       }
       if (topics.size() != 0 && message.getDestination() == null) {
@@ -178,11 +183,12 @@ public class SolaceSinkSender {
         while (topics.size() > count) {
           try {
             topicProducer.send(message, topics.get(count));
+          } catch (IllegalArgumentException e) {
+            throw new ConnectException(String.format("Received exception while sending message to topic %s",
+                    topics.get(count).getName()), e);
           } catch (JCSMPException e) {
-            log.trace(
-                "================ Received exception while sending message to topic {}:  "
-                + "{}, with the following: {} ",
-                topics.get(count).getName(), e.getCause(), e.getStackTrace());
+            throw new RetriableException(String.format("Received exception while sending message to topic %s",
+                    topics.get(count).getName()), e);
           }
           count++;
         }

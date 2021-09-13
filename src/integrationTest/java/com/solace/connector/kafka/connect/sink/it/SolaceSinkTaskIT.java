@@ -3,16 +3,27 @@ package com.solace.connector.kafka.connect.sink.it;
 import com.solace.connector.kafka.connect.sink.SolRecordProcessorIF;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
 import com.solace.connector.kafka.connect.sink.SolaceSinkTask;
+import com.solace.connector.kafka.connect.sink.recordprocessor.SolDynamicDestinationRecordProcessor;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientProfile;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientUsername;
+import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
+import com.solacesystems.jcsmp.ClosedFacilityException;
 import com.solacesystems.jcsmp.JCSMPException;
+import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.Queue;
+import com.solacesystems.jcsmp.Topic;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.errors.RetriableException;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,9 +33,14 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -128,5 +144,58 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown.getMessage(), containsString("Failed to create Transacted Session"));
 		assertThat(thrown.getCause(), instanceOf(JCSMPException.class));
 		assertThat(thrown.getCause().getMessage(), containsString("Router does not support transacted sessions"));
+	}
+
+	@Test
+	public void testSendToTopicThrowsJCSMPException() {
+		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
+		solaceSinkTask.start(connectorProperties);
+
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+
+		solaceSinkTask.stop();
+		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(
+				Collections.singleton(sinkRecord)));
+		assertThat(thrown, instanceOf(RetriableException.class));
+		assertThat(thrown.getMessage(), containsString("Received exception while sending message to topic"));
+		assertThat(thrown.getCause(), instanceOf(ClosedFacilityException.class));
+	}
+
+	@Test
+	public void testSendToQueueThrowsJCSMPException(Queue queue) {
+		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+		solaceSinkTask.start(connectorProperties);
+
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+
+		solaceSinkTask.stop();
+		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(
+				Collections.singleton(sinkRecord)));
+		assertThat(thrown, instanceOf(RetriableException.class));
+		assertThat(thrown.getMessage(), containsString("Received exception while sending message to queue"));
+		assertThat(thrown.getCause(), instanceOf(ClosedFacilityException.class));
+	}
+
+	@Test
+	public void testSendToDynamicTopicThrowsJCSMPException() {
+		connectorProperties.put(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, "true");
+		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolDynamicDestinationRecordProcessor.class.getName());
+		solaceSinkTask.start(connectorProperties);
+
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, String.format("%s %s", RandomStringUtils.randomAlphanumeric(4),
+						RandomStringUtils.randomAlphanumeric(100)).getBytes(StandardCharsets.UTF_8), 0);
+
+		solaceSinkTask.stop();
+		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(
+				Collections.singleton(sinkRecord)));
+		assertThat(thrown, instanceOf(RetriableException.class));
+		assertThat(thrown.getMessage(), containsString("Received exception while sending message to topic"));
+		assertThat(thrown.getCause(), instanceOf(ClosedFacilityException.class));
 	}
 }
