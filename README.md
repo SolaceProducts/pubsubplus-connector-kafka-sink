@@ -267,9 +267,13 @@ Note that generally one connector can send to only one queue.
 
 ##### Recovery from Kafka Connect API or Kafka Broker Failure
 
+Operators are expected to monitor their connector for failures since errors will cause it to stop. If any are found and the connector was stopped, the operator must explicitly restart it again once the error condition has been resolved.
+
 The Kafka Connect API automatically keeps track of the offset that the Sink Connector has read and processed. If the connector stops or is restarted, the Connect API starts passing records to the connector based on the last saved offset.
 
 The time interval to save the last offset can be tuned via the `offset.flush.interval.ms` parameter (default 60,000 ms) in the worker's `connect-distributed.properties` configuration file.
+
+Multiple retries can also be configured using the `errors.retry.timeout` parameter (default 0 ms) in the PubSub+ Sink Connector `solace_sink.properties` configuration file. Please refer to the [Kafka documentation](https://kafka.apache.org/documentation/#connect_errorreporting) for more info on retry configuration options.
 
 Recovery may result in duplicate PubSub+ events published to the Event Mesh. As described [above](#record-processors), the Solace message header "User Property Map" contains all the Kafka unique record information which enables identifying and filtering duplicates.
 
