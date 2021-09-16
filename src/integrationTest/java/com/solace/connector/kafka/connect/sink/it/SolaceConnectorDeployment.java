@@ -1,40 +1,37 @@
 package com.solace.connector.kafka.connect.sink.it;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Properties;
-
-import okhttp3.ResponseBody;
-import org.apache.commons.configuration2.Configuration;
-import org.apache.commons.configuration2.FileBasedConfiguration;
-import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
-import org.apache.commons.configuration2.builder.fluent.Parameters;
-import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.commons.io.FileUtils;
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
+import org.apache.commons.io.FileUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.DeleteTopicsResult;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
@@ -44,6 +41,7 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   static String kafkaTestTopic = KAFKA_SINK_TOPIC + "-" + Instant.now().getEpochSecond();
   OkHttpClient client = new OkHttpClient();
+  AdminClient adminClient;
   String connectorAddress = new TestConfigProperties().getProperty("kafka.connect_rest_url");
 
   public void waitForConnectorRestIFUp() {
@@ -61,19 +59,35 @@ public class SolaceConnectorDeployment implements TestConstants {
     } while (!success);
   }
 
+  public void startAdminClient() {
+    if (adminClient == null) {
+      String bootstrapServers = MessagingServiceFullLocalSetupConfluent.COMPOSE_CONTAINER_KAFKA.getServiceHost("kafka_1",
+              39092) + ":39092";
+      Properties properties = new Properties();
+      properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      adminClient = AdminClient.create(properties);
+    }
+  }
+
+  public void closeAdminClient() {
+    if (adminClient != null) {
+      adminClient.close();
+      adminClient = null;
+    }
+  }
+
   public void provisionKafkaTestTopic() {
     // Create a new kafka test topic to use
-    String bootstrapServers = MessagingServiceFullLocalSetupConfluent.COMPOSE_CONTAINER_KAFKA.getServiceHost("kafka_1",
-        39092) + ":39092";
-    Properties properties = new Properties();
-    properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-    AdminClient adminClient = AdminClient.create(properties);
     NewTopic newTopic = new NewTopic(kafkaTestTopic, 1, (short) 1); // new NewTopic(topicName, numPartitions,
                                                                     // replicationFactor)
     List<NewTopic> newTopics = new ArrayList<NewTopic>();
     newTopics.add(newTopic);
     adminClient.createTopics(newTopics);
-    adminClient.close();
+  }
+
+  public void deleteKafkaTestTopic() throws ExecutionException, InterruptedException, TimeoutException {
+    DeleteTopicsResult result = adminClient.deleteTopics(Collections.singleton(kafkaTestTopic));
+    result.all().get(1, TimeUnit.MINUTES);
   }
 
   void startConnector() {
@@ -81,6 +95,7 @@ public class SolaceConnectorDeployment implements TestConstants {
   }
 
   void startConnector(Properties props) {
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String configJson = null;
     // Prep config files
     try {
@@ -109,7 +124,6 @@ public class SolaceConnectorDeployment implements TestConstants {
           jobject.addProperty((String) key, (String) value);
         });
       }
-      Gson gson = new Gson();
       configJson = gson.toJson(jtree);
     } catch (IOException e) {
       e.printStackTrace();
@@ -128,11 +142,7 @@ public class SolaceConnectorDeployment implements TestConstants {
       }
 
       // Delete a running connector, if any
-      Request deleterequest = new Request.Builder()
-          .url("http://" + connectorAddress + "/connectors/solaceSinkConnector").delete().build();
-      try (Response deleteresponse = client.newCall(deleterequest).execute()) {
-        logger.info("Delete response: " + deleteresponse);
-      }
+      deleteConnector();
 
       // configure plugin: curl -X POST -H "Content-Type: application/json" -d
       // @solace_source_properties.json http://18.218.82.209:8083/connectors
@@ -145,12 +155,28 @@ public class SolaceConnectorDeployment implements TestConstants {
         logger.info("Connector config results: " + configresults);
       }
       // check success
+      AtomicReference<JsonObject> statusResponse = new AtomicReference<>(new JsonObject());
+      assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+        JsonObject connectorStatus;
+        do {
+          connectorStatus = getConnectorStatus();
+          statusResponse.set(connectorStatus);
+        } while (!"RUNNING".equals(connectorStatus.getAsJsonObject("connector").get("state").getAsString()));
+      }, () -> "Timed out while waiting for connector to start: " + gson.toJson(statusResponse.get()));
       Thread.sleep(5000); // Give some time to start
     } catch (IOException e) {
       e.printStackTrace();
     } catch (InterruptedException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
+    }
+  }
+
+  public void deleteConnector() throws IOException {
+    Request request = new Request.Builder()
+            .url("http://" + connectorAddress + "/connectors/solaceSinkConnector").delete().build();
+    try (Response response = client.newCall(request).execute()) {
+      logger.info("Delete response: " + response);
     }
   }
 

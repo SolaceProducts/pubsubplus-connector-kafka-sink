@@ -1,46 +1,38 @@
 package com.solace.connector.kafka.connect.sink.it;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
-import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.FlowReceiver;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
-import com.solacesystems.jcsmp.Message;
 import com.solacesystems.jcsmp.Queue;
-import com.solacesystems.jcsmp.TextMessage;
-import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
-import com.solacesystems.jcsmp.XMLMessageProducer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class TestSolaceConsumer {
-    
+
     // Queue to communicate received messages
-    public static BlockingQueue<BytesXMLMessage> solaceReceivedTopicMessages  = new ArrayBlockingQueue<>(10);
-    public static BlockingQueue<BytesXMLMessage> solaceReceivedQueueMessages  = new ArrayBlockingQueue<>(10);
-    
+    public static BlockingQueue<BytesXMLMessage> solaceReceivedTopicMessages  = new ArrayBlockingQueue<>(10000);
+    public static BlockingQueue<BytesXMLMessage> solaceReceivedQueueMessages  = new ArrayBlockingQueue<>(10000);
+
     static Logger logger = LoggerFactory.getLogger(SinkConnectorIT.class.getName());
+    private JCSMPProperties properties;
     private JCSMPSession session;
     private XMLMessageConsumer topicSubscriber;
     private FlowReceiver queueConsumer;
     private String queueName;
 
-    public void initialize(String host, String user, String password, String messagevpn) {
+    public void initialize() {
         TestConfigProperties configProps = new TestConfigProperties();
-        final JCSMPProperties properties = new JCSMPProperties();
+        properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, "tcp://" + configProps.getProperty("sol.host") + ":55555");     // host:port
         properties.setProperty(JCSMPProperties.USERNAME, configProps.getProperty("sol.username")); // client-username
         properties.setProperty(JCSMPProperties.VPN_NAME,  configProps.getProperty("sol.vpn_name")); // message-vpn
@@ -52,22 +44,25 @@ public class TestSolaceConsumer {
             e1.printStackTrace();
         }
     }
-    
+
     public void provisionQueue(String queueName) throws JCSMPException {
+        provisionQueue(queueName, new EndpointProperties());
+    }
+
+    public void provisionQueue(String queueName, EndpointProperties endpointProps) throws JCSMPException {
         this.queueName = queueName;
         final Queue queue = JCSMPFactory.onlyInstance().createQueue(queueName);
         // Provision queue in case it doesn't exist, and do not fail if it already exists
-        final EndpointProperties endpointProps = new EndpointProperties();
         endpointProps.setPermission(EndpointProperties.PERMISSION_CONSUME);
         endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
         session.provision(queue, endpointProps, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
         logger.info("Ensured Solace queue " + queueName + " exists.");
     }
-    
+
     public void start() throws JCSMPException {
-        
+
         // Create and start topic subscriber
-        
+
         topicSubscriber = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage msg) {
@@ -86,7 +81,7 @@ public class TestSolaceConsumer {
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic("comms" + "/>"));
         logger.info("Topic subscriber connected. Awaiting message...");
         topicSubscriber.start();
-        
+
         // Create and start queue consumer
         final ConsumerFlowProperties flow_prop = new ConsumerFlowProperties();
         flow_prop.setEndpoint(JCSMPFactory.onlyInstance().createQueue(queueName));
@@ -96,7 +91,8 @@ public class TestSolaceConsumer {
         queueConsumer = session.createFlow(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage msg) {
-                logger.info("Queue message received");
+                logger.info("Queue message received from {} with user properties: {}", msg.getDestination(),
+                        msg.getProperties());
                 solaceReceivedQueueMessages.add(msg);
                 msg.ackMessage();
             }
@@ -111,11 +107,18 @@ public class TestSolaceConsumer {
         logger.info("Queue receiver connected. Awaiting message...");
         queueConsumer.start();
     }
-    
+
     public void stop() {
         queueConsumer.stop();
         topicSubscriber.stop();
         session.closeSession();
     }
 
+    public JCSMPSession getSession() {
+        return session;
+    }
+
+    public JCSMPProperties getProperties() {
+        return properties;
+    }
 }

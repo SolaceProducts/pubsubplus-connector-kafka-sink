@@ -51,7 +51,6 @@ public class SolaceSinkSender {
   private XMLMessageProducer topicProducer;
   private XMLMessageProducer queueProducer;
   private SolSessionHandler sessionHandler;
-  private BytesXMLMessage message;
   private List<Topic> topics = new ArrayList<Topic>();
   private Queue solQueue = null;
   private boolean useTxforQueue = false;
@@ -119,6 +118,7 @@ public class SolaceSinkSender {
    * @param record Kafka Records
    */
   public void sendRecord(SinkRecord record) {
+    BytesXMLMessage message;
     try {
       message = processor.processRecord(kafkaKey, record);
       offsets.put(new TopicPartition(record.topic(), record.kafkaPartition()),
@@ -198,32 +198,28 @@ public class SolaceSinkSender {
     // Solace limits transaction size to 255 messages so need to force commit
     if ( useTxforQueue && txMsgCounter.get() > sconfig.getInt(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE)-1 ) {
       log.debug("================ Queue transaction autoflush size reached, flushing offsets from connector");
-      sinkTask.flush(offsets);
+      try {
+        sinkTask.flush(offsets);
+      } catch (ConnectException e) {
+        if (e.getCause() instanceof JCSMPException) {
+          throw new RetriableException(e.getMessage(), e.getCause());
+        } else {
+          throw e;
+        }
+      }
     }
   }
 
   /**
    * Commit Solace and Kafka records.
-   * @return Boolean Status
    */
-  public synchronized boolean commit() {
-    boolean commited = true;
-    try {
-      if (useTxforQueue) {
-        sessionHandler.getTxSession().commit();
-        commited = true;
-        txMsgCounter.set(0);
-        log.debug("Comitted Solace records for transaction with status: {}",
-            sessionHandler.getTxSession().getStatus().name());
-      }
-    } catch (JCSMPException e) {
-      log.info("Received Solace TX exception {}, with the following: {} ",
-          e.getCause(), e.getStackTrace());
-      log.info("The TX error could be due to using dynamic destinations and "
-          + "  \"sol.dynamic_destination=true\" was not set in the configuration ");
-      commited = false;
+  public synchronized void commit() throws JCSMPException {
+    if (useTxforQueue) {
+      sessionHandler.getTxSession().commit();
+      txMsgCounter.set(0);
+      log.debug("Comitted Solace records for transaction with status: {}",
+          sessionHandler.getTxSession().getStatus().name());
     }
-    return commited;
   }
 
   /**

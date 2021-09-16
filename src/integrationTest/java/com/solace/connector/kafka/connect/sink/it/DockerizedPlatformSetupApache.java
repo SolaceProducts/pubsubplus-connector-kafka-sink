@@ -25,6 +25,8 @@ public class DockerizedPlatformSetupApache implements MessagingServiceFullLocalS
                           + ":39092/g' /opt/bitnami/kafka/config/connect-distributed.properties; "
                           + "echo 'plugin.path=/opt/bitnami/kafka/jars' >> /opt/bitnami/kafka/config/connect-distributed.properties; "
                           + "echo 'rest.port=28083' >> /opt/bitnami/kafka/config/connect-distributed.properties; "
+                          + "echo 'log4j.logger.org.apache.kafka.connect.runtime.WorkerSinkTask=DEBUG' >> /opt/bitnami/kafka/config/connect-log4j.properties; "
+                          + "echo 'log4j.logger.com.solace.connector.kafka.connect.sink.SolaceSinkTask=TRACE' >> /opt/bitnami/kafka/config/connect-log4j.properties; "
                           + "/opt/bitnami/kafka/bin/connect-distributed.sh /opt/bitnami/kafka/config/connect-distributed.properties")
                   .withFixedExposedPort(28083,28083)
                   .withExposedPorts(28083)

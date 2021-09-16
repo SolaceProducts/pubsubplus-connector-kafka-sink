@@ -20,11 +20,6 @@
 package com.solace.connector.kafka.connect.sink;
 
 import com.solacesystems.jcsmp.JCSMPException;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -33,6 +28,11 @@ import org.apache.kafka.connect.sink.SinkTask;
 import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 public class SolaceSinkTask extends SinkTask {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkTask.class);
@@ -122,10 +122,12 @@ public class SolaceSinkTask extends SinkTask {
           tp.partition(), om.offset());
     }
     if (useTxforQueue) {
-      boolean commited = solSender.commit();
-      if (!commited) {
-        log.info("Error in commiting transaction, shutting down");
-        stop();
+      try {
+        solSender.commit();
+      } catch (JCSMPException e) {
+        // Consider using RetriableException if the Kafka Connect API one day decides to support it for flush/commit
+        throw new ConnectException("Error in committing transaction. The TX error could be due to using dynamic " +
+                "destinations and \"sol.dynamic_destination=true\" was not set in the configuration.", e);
       }
     }
   }

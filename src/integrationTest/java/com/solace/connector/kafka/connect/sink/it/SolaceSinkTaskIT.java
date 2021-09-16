@@ -11,10 +11,9 @@ import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientUserna
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
 import com.solacesystems.jcsmp.ClosedFacilityException;
 import com.solacesystems.jcsmp.JCSMPException;
-import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.Queue;
-import com.solacesystems.jcsmp.Topic;
+import com.solacesystems.jcsmp.transaction.RollbackException;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -34,18 +33,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 @ExtendWith(PubSubPlusExtension.class)
 public class SolaceSinkTaskIT {
@@ -197,5 +195,66 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown, instanceOf(RetriableException.class));
 		assertThat(thrown.getMessage(), containsString("Received exception while sending message to topic"));
 		assertThat(thrown.getCause(), instanceOf(ClosedFacilityException.class));
+	}
+
+	@Test
+	public void testCommitRollback(SempV2Api sempV2Api, Queue queue) throws Exception {
+		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
+
+		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
+		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null);
+
+		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
+			while (sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
+					.getMaxMsgSize() != 1) {
+				logger.info("Waiting for queue {} to have max message size of 1", queue.getName());
+				Thread.sleep(100);
+			}
+		});
+
+		solaceSinkTask.start(connectorProperties);
+
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		Map<TopicPartition, OffsetAndMetadata> currentOffsets = Collections.singletonMap(
+				new TopicPartition(sinkRecord.topic(), sinkRecord.kafkaPartition()),
+				new OffsetAndMetadata(sinkRecord.kafkaOffset()));
+
+		solaceSinkTask.put(Collections.singleton(sinkRecord));
+		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.flush(currentOffsets));
+		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
+		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
+		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
+	}
+
+	@Test
+	public void testAutoFlushCommitRollback(SempV2Api sempV2Api, Queue queue) throws Exception {
+		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
+		connectorProperties.put(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE, Integer.toString(1));
+
+		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
+		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null);
+
+		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
+			while (sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
+					.getMaxMsgSize() != 1) {
+				logger.info("Waiting for queue {} to have max message size of 1", queue.getName());
+				Thread.sleep(100);
+			}
+		});
+
+		solaceSinkTask.start(connectorProperties);
+
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+
+		ConnectException thrown = assertThrows(RetriableException.class, () -> solaceSinkTask.put(Collections.singleton(sinkRecord)));
+		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
+		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
+		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
 	}
 }
