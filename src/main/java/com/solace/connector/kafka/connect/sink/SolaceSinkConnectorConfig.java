@@ -63,6 +63,9 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR,
             Type.CLASS, SolRecordProcessorIF.class, Importance.HIGH,
             "default Solace message processor to use against Kafka Sink Records")
+        .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR,
+            Type.BOOLEAN, false, Importance.MEDIUM,
+            "If enabled, records that throw record processor errors will be discarded")
         .define(SolaceSinkConstants.SOL_LOCALHOST, Type.STRING, null, Importance.LOW,
             "The hostname or IP address of the machine on which the application "
             + "is running. On a multihomed machine, it is strongly recommended "

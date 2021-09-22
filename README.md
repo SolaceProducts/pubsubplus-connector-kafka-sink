@@ -345,6 +345,7 @@ An integration test suite is also included, which spins up a Docker-based deploy
 
 1. Install the test support module:
     ```shell
+    git submodule update --init --recursive
     cd solace-integration-test-support
     ./mvnw clean install -DskipTests
     cd ..

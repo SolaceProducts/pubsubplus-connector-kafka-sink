@@ -2,17 +2,24 @@ package com.solace.connector.kafka.connect.sink.it;
 
 import com.solace.connector.kafka.connect.sink.SolRecordProcessorIF;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
+import com.solace.connector.kafka.connect.sink.SolaceSinkSender;
 import com.solace.connector.kafka.connect.sink.SolaceSinkTask;
 import com.solace.connector.kafka.connect.sink.recordprocessor.SolDynamicDestinationRecordProcessor;
+import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
+import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
+import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension;
+import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension.LogCaptor;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientProfile;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientUsername;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
+import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ClosedFacilityException;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.Queue;
+import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.transaction.RollbackException;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -32,19 +39,28 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.instanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+@ExtendWith(ExecutorServiceExtension.class)
+@ExtendWith(LogCaptorExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
 public class SolaceSinkTaskIT {
 	private SolaceSinkTask solaceSinkTask;
@@ -197,6 +213,75 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown.getCause(), instanceOf(ClosedFacilityException.class));
 	}
 
+	@ParameterizedTest(name = "[{index}] ignoreRecordProcessorError={0}")
+	@ValueSource(booleans = { true, false })
+	public void testInvalidDynamicDestination(boolean ignoreRecordProcessorError,
+											  @ExecSvc ExecutorService executorService,
+											  @LogCaptor(SolaceSinkSender.class) BufferedReader logReader) throws Exception {
+		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, BadSolDynamicDestinationRecordProcessor.class.getName());
+		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR, Boolean.toString(ignoreRecordProcessorError));
+		connectorProperties.put(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Boolean.toString(true));
+		solaceSinkTask.start(connectorProperties);
+
+		Set<SinkRecord> records = Collections.singleton(new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, String.format("%s %s", RandomStringUtils.randomAlphanumeric(4),
+				RandomStringUtils.randomAlphanumeric(100)).getBytes(StandardCharsets.UTF_8), 0));
+
+		if (ignoreRecordProcessorError) {
+			Future<?> future = executorService.submit(() -> {
+				String logLine;
+				do {
+					try {
+						logLine = logReader.readLine();
+					} catch (IOException e) {
+						throw new RuntimeException(e);
+					}
+				} while (!logLine.contains("Received exception retrieving Dynamic Destination"));
+			});
+			solaceSinkTask.put(records);
+			future.get(30, TimeUnit.SECONDS);
+		} else {
+			ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(records));
+			assertThat(thrown.getMessage(), containsString("Received exception retrieving Dynamic Destination"));
+			assertThat(thrown.getCause(), instanceOf(SDTException.class));
+			assertThat(thrown.getCause().getMessage(), containsString("No conversion from String to Destination"));
+		}
+	}
+
+	@ParameterizedTest(name = "[{index}] ignoreRecordProcessorError={0}")
+	@ValueSource(booleans = { true, false })
+	public void testRecordProcessorError(boolean ignoreRecordProcessorError,
+										 @ExecSvc ExecutorService executorService,
+										 @LogCaptor(SolaceSinkSender.class) BufferedReader logReader) throws Exception {
+		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, BadRecordProcessor.class.getName());
+		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR, Boolean.toString(ignoreRecordProcessorError));
+		solaceSinkTask.start(connectorProperties);
+
+		Set<SinkRecord> records = Collections.singleton(new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0));
+
+		if (ignoreRecordProcessorError) {
+			Future<?> future = executorService.submit(() -> {
+				String logLine;
+				do {
+					try {
+						logLine = logReader.readLine();
+					} catch (IOException e) {
+						throw new RuntimeException(e);
+					}
+				} while (!logLine.contains("Encountered exception in record processing"));
+			});
+			solaceSinkTask.put(records);
+			future.get(30, TimeUnit.SECONDS);
+		} else {
+			ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(records));
+			assertThat(thrown.getMessage(), containsString("Encountered exception in record processing"));
+			assertEquals(BadRecordProcessor.TEST_EXCEPTION, thrown.getCause());
+		}
+	}
+
 	@Test
 	public void testCommitRollback(SempV2Api sempV2Api, Queue queue) throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
@@ -256,5 +341,27 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
 		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
 		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
+	}
+
+	public static class BadRecordProcessor implements SolRecordProcessorIF {
+		static final RuntimeException TEST_EXCEPTION = new RuntimeException("Some processing failure");
+
+		@Override
+		public BytesXMLMessage processRecord(String skey, SinkRecord record) {
+			throw TEST_EXCEPTION;
+		}
+	}
+
+	public static class BadSolDynamicDestinationRecordProcessor extends SolDynamicDestinationRecordProcessor {
+		@Override
+		public BytesXMLMessage processRecord(String skey, SinkRecord record) {
+			BytesXMLMessage msg = super.processRecord(skey, record);
+			try {
+				msg.getProperties().putString("dynamicDestination", "abc");
+			} catch (SDTException e) {
+				throw new RuntimeException(e);
+			}
+			return msg;
+		}
 	}
 }

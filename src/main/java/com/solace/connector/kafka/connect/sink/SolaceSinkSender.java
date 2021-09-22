@@ -127,11 +127,13 @@ public class SolaceSinkSender {
           + "Offset: {}", record.topic(),
           record.kafkaPartition(), record.kafkaOffset());
     } catch (Exception e) {
-      log.info(
-          "================ Encountered exception in record processing....discarded."
-          + " Cause: {}, Stacktrace: {} ",
-          e.getCause(), e.getStackTrace());
-      return;
+      if (sconfig.getBoolean(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR)) {
+        log.warn("================ Encountered exception in record processing for record of topic {}, partition {} " +
+                        "and offset {}....discarded", record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
+        return;
+      } else {
+        throw new ConnectException("Encountered exception in record processing", e);
+      }
     }
 
     if (message.getAttachmentContentLength() == 0 || message.getAttachmentByteBuffer() == null) {
@@ -146,9 +148,12 @@ public class SolaceSinkSender {
       try {
         dest = userMap.getDestination("dynamicDestination");
       } catch (SDTException e) {
-        log.info("================ Received exception retrieving Dynamic Destination:  "
-            + "{}, with the following: {} ",
-            e.getCause(), e.getStackTrace());
+        if (sconfig.getBoolean(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR)) {
+          log.warn("================ Received exception retrieving Dynamic Destination....discarded", e);
+          return;
+        } else {
+          throw new ConnectException("Received exception retrieving Dynamic Destination", e);
+        }
       }
       try {
         topicProducer.send(message, dest);

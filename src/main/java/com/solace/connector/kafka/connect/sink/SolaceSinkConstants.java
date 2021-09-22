@@ -30,6 +30,9 @@ public class SolaceSinkConstants {
   // High Importance Solace Message processor of Kafka Sink Records
   public static final String SOL_RECORD_PROCESSOR = "sol.record_processor_class";
 
+  // Medium Importance Solace Message processor of Kafka Sink Records
+  public static final String SOL_RECORD_PROCESSOR_IGNORE_ERROR = "sol.record_processor.error.ignore";
+
   // High Importance Solace
   public static final String SOL_HOST = "sol.host";
   public static final String SOL_USERNAME = "sol.username";
@@ -50,12 +53,12 @@ public class SolaceSinkConstants {
   public static final String SOL_CALCULATE_MESSAGE_EXPIRATION = "sol.calculate_message_expiration";
   public static final String SOL_REAPPLY_SUBSCRIPTIONS = "sol.reapply_subscriptions";
   public static final String SOL_PUB_MULTI_THREAD = "sol.pub_multi_thread";
-  public static final String SOL_PUB_USE_INTERMEDIATE_DIRECT_BUF 
+  public static final String SOL_PUB_USE_INTERMEDIATE_DIRECT_BUF
       = "sol.pub_use_immediate_direct_pub";
   public static final String SOL_MESSAGE_CALLBACK_ON_REACTOR = "sol.message_callback_on_reactor";
-  public static final String SOL_IGNORE_DUPLICATE_SUBSCRIPTION_ERROR 
+  public static final String SOL_IGNORE_DUPLICATE_SUBSCRIPTION_ERROR
       = "sol.ignore_duplicate_subscription_error";
-  public static final String SOL_IGNORE_SUBSCRIPTION_NOT_FOUND_ERROR 
+  public static final String SOL_IGNORE_SUBSCRIPTION_NOT_FOUND_ERROR
       = "sol.ignore_subscription_not_found_error";
   public static final String SOL_NO_LOCAL = "sol.no_local";
   public static final String SOL_ACK_EVENT_MODE = "sol.ack_event_mode";
@@ -77,35 +80,35 @@ public class SolaceSinkConstants {
   public static final String SOL_SSL_KEY_STORE = "sol.ssl_key_store";
   public static final String SOL_SSL_KEY_STORE_PASSWORD = "sol.ssl_key_store_password";
   public static final String SOL_SSL_KEY_STORE_FORMAT = "sol.ssl_key_store_format";
-  public static final String SOL_SSL_KEY_STORE_NORMALIZED_FORMAT 
+  public static final String SOL_SSL_KEY_STORE_NORMALIZED_FORMAT
       = "sol.ssl_key_store_normalized_format";
   public static final String SOL_SSL_PRIVATE_KEY_ALIAS = "sol.ssl_private_key_alias";
   public static final String SOL_SSL_PRIVATE_KEY_PASSWORD = "sol.ssl_private_key_password";
 
   // Low Importance Solace Channel Properties
-  public static final String SOL_CHANNEL_PROPERTY_connectTimeoutInMillis 
+  public static final String SOL_CHANNEL_PROPERTY_connectTimeoutInMillis
       = "sol.channel_properties.connect_timout_in_millis";
-  public static final String SOL_CHANNEL_PROPERTY_readTimeoutInMillis 
+  public static final String SOL_CHANNEL_PROPERTY_readTimeoutInMillis
       = "sol.channel_properties.read_timeout_in_millis";
-  public static final String SOL_CHANNEL_PROPERTY_connectRetries 
+  public static final String SOL_CHANNEL_PROPERTY_connectRetries
       = "sol.channel_properties.connect_retries";
-  public static final String SOL_CHANNEL_PROPERTY_reconnectRetries 
+  public static final String SOL_CHANNEL_PROPERTY_reconnectRetries
       = "sol.channel_properties.reconnect_retries";
-  public static final String SOL_CHANNEL_PROPERTY_connectRetriesPerHost 
+  public static final String SOL_CHANNEL_PROPERTY_connectRetriesPerHost
       = "sol.channnel_properties.connect_retries_per_host";
-  public static final String SOL_CHANNEL_PROPERTY_reconnectRetryWaitInMillis 
+  public static final String SOL_CHANNEL_PROPERTY_reconnectRetryWaitInMillis
       = "sol.channel_properties.reconnect_retry_wait_in_millis";
-  public static final String SOL_CHANNEL_PROPERTY_keepAliveIntervalInMillis 
+  public static final String SOL_CHANNEL_PROPERTY_keepAliveIntervalInMillis
       = "sol.channel_properties.keep_alive_interval_in_millis";
-  public static final String SOL_CHANNEL_PROPERTY_keepAliveLimit 
+  public static final String SOL_CHANNEL_PROPERTY_keepAliveLimit
       = "sol.channel_properties.keep_alive_limit";
-  public static final String SOL_CHANNEL_PROPERTY_sendBuffer 
+  public static final String SOL_CHANNEL_PROPERTY_sendBuffer
       = "sol.channel_properties.send_buffer";
-  public static final String SOL_CHANNEL_PROPERTY_receiveBuffer 
+  public static final String SOL_CHANNEL_PROPERTY_receiveBuffer
       = "sol.channle_properties.receive_buffer";
-  public static final String SOL_CHANNEL_PROPERTY_tcpNoDelay 
+  public static final String SOL_CHANNEL_PROPERTY_tcpNoDelay
       = "sol.channel_properties.tcp_no_delay";
-  public static final String SOL_CHANNEL_PROPERTY_compressionLevel 
+  public static final String SOL_CHANNEL_PROPERTY_compressionLevel
       = "sol.channel_properties.compression_level";
 
   // Low Importance Persistent Message Properties
@@ -132,7 +135,7 @@ public class SolaceSinkConstants {
   // Allowable values for the test sample include: NONE, DESTINATION,
   // CORRELATION_ID, CORRELATION_ID_AS_BYTES
   public static final String SOL_KAFKA_MESSAGE_KEY = "sol.kafka_message_key";
-  
+
   // Low importance, offset for replay - if null, continue from last offset when was last stopped
   // value of 0 is start from beginning
   public static final String SOL_KAFKA_REPLAY_OFFSET = "sol.kafka_replay_offset";
@@ -140,10 +143,10 @@ public class SolaceSinkConstants {
   // Allow SolRecordProcessor to control the creation of destinations rather than SolaceSinkSender
   // Requires a destination property in the user SDTMap with a key "dynamicDestination"
   public static final String SOL_DYNAMIC_DESTINATION = "sol.dynamic_destination";
-  
+
   //Low importance Kerberos details
   public static final String SOL_KERBEROS_LOGIN_CONFIG = "sol.kerberos.login.conf";
-  public static final String SOL_KERBEROS_KRB5_CONFIG = "sol.kerberos.krb5.conf";  
-  
+  public static final String SOL_KERBEROS_KRB5_CONFIG = "sol.kerberos.krb5.conf";
+
 
 }
