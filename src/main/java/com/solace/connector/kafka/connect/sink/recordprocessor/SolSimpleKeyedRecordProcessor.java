@@ -63,12 +63,12 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessorIF {
       userHeader.putInteger("k_partition", record.kafkaPartition());
       userHeader.putLong("k_offset", record.kafkaOffset());
     } catch (SDTException e) {
-      log.info("Received Solace SDTException {}, with the following: {} ", 
+      log.info("Received Solace SDTException {}, with the following: {} ",
           e.getCause(), e.getStackTrace());
     }
     msg.setProperties(userHeader);
     msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
-    
+
     Object recordKey = record.key();
     Schema keySchema = record.keySchema();
 
@@ -101,7 +101,7 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessorIF {
       }
     } else if (keyheader == KeyHeader.DESTINATION && keySchema.type() == Schema.Type.STRING) {
         // Destination is already determined by sink settings so set just the correlationId.
-        // Receiving app can evaluate it 
+        // Receiving app can evaluate it
         msg.setCorrelationId((String) recordKey);
     } else {
       // Do nothing in all other cases
@@ -118,7 +118,7 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessorIF {
         } else if (recordValue instanceof ByteBuffer) {
           msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
         } else if (recordValue instanceof String) {
-          msg.writeAttachment(((String) recordValue).getBytes());
+          msg.writeAttachment(((String) recordValue).getBytes(StandardCharsets.UTF_8));
         } else {
           // Unknown recordValue type
           msg.reset();
@@ -130,9 +130,9 @@ public class SolSimpleKeyedRecordProcessor implements SolRecordProcessorIF {
           msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
         }
       } else if (valueSchema.type() == Schema.Type.STRING) {
-        msg.writeAttachment(((String) recordValue).getBytes());
+        msg.writeAttachment(((String) recordValue).getBytes(StandardCharsets.UTF_8));
       } else {
-        // Do nothing in all other cases 
+        // Do nothing in all other cases
         msg.reset();
       }
     } else {
