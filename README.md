@@ -1,4 +1,5 @@
 [![Actions Status](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/workflows/build/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions?query=workflow%3Abuild+branch%3Amaster)
+[![Code Analysis (CodeQL)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/codeql-analysis.yml/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/codeql-analysis.yml)
 [![Code Analysis (SpotBugs)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/spotbugs-analysis.yml/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/spotbugs-analysis.yml)
 
 # Solace PubSub+ Connector for Kafka: Sink
