@@ -2,9 +2,13 @@ package com.solace.connector.kafka.connect.sink.it;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.solace.connector.kafka.connect.sink.SolaceSinkConnector;
+import com.solace.connector.kafka.connect.sink.VersionUtil;
+import com.solacesystems.jcsmp.JCSMPProperties;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -25,6 +29,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
@@ -33,7 +38,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SolaceConnectorDeployment implements TestConstants {
 
@@ -42,10 +49,20 @@ public class SolaceConnectorDeployment implements TestConstants {
   static String kafkaTestTopic = KAFKA_SINK_TOPIC + "-" + Instant.now().getEpochSecond();
   OkHttpClient client = new OkHttpClient();
   AdminClient adminClient;
-  String connectorAddress = new TestConfigProperties().getProperty("kafka.connect_rest_url");
+  private final String connectHost;
+  private final String bootstrapHost;
+  private final String pubSubPlusHost;
+  private final JCSMPProperties jcsmpProperties;
+
+  public SolaceConnectorDeployment(String connectHost, String bootstrapHost, String pubSubPlusHost, JCSMPProperties jcsmpProperties) {
+    this.connectHost = connectHost;
+    this.bootstrapHost = bootstrapHost;
+    this.pubSubPlusHost = pubSubPlusHost;
+    this.jcsmpProperties = jcsmpProperties;
+  }
 
   public void waitForConnectorRestIFUp() {
-    Request request = new Request.Builder().url("http://" + connectorAddress + "/connector-plugins").build();
+    Request request = new Request.Builder().url(connectHost + "/connector-plugins").build();
     boolean success = false;
     do {
       try {
@@ -61,10 +78,8 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public void startAdminClient() {
     if (adminClient == null) {
-      String bootstrapServers = MessagingServiceFullLocalSetupConfluent.COMPOSE_CONTAINER_KAFKA.getServiceHost("kafka_1",
-              39092) + ":39092";
       Properties properties = new Properties();
-      properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapHost);
       adminClient = AdminClient.create(properties);
     }
   }
@@ -107,10 +122,10 @@ public class SolaceConnectorDeployment implements TestConstants {
       JsonElement jconfig = jtree.getAsJsonObject().get("config");
       JsonObject jobject = jconfig.getAsJsonObject();
       // Set properties defaults
-      jobject.addProperty("sol.host", "tcp://" + new TestConfigProperties().getProperty("sol.host") + ":55555");
-      jobject.addProperty("sol.username", SOL_ADMINUSER_NAME);
-      jobject.addProperty("sol.password", SOL_ADMINUSER_PW);
-      jobject.addProperty("sol.vpn_name", SOL_VPN);
+      jobject.addProperty("sol.host", pubSubPlusHost);
+      jobject.addProperty("sol.username", jcsmpProperties.getStringProperty(JCSMPProperties.USERNAME));
+      jobject.addProperty("sol.password", jcsmpProperties.getStringProperty(JCSMPProperties.PASSWORD));
+      jobject.addProperty("sol.vpn_name", jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME));
       jobject.addProperty("topics", kafkaTestTopic);
       jobject.addProperty("sol.topics", SOL_TOPICS);
       jobject.addProperty("sol.autoflush.size", "1");
@@ -133,12 +148,22 @@ public class SolaceConnectorDeployment implements TestConstants {
     try {
       // check presence of Solace plugin: curl
       // http://18.218.82.209:8083/connector-plugins | jq
-      Request request = new Request.Builder().url("http://" + connectorAddress + "/connector-plugins").build();
+      Request request = new Request.Builder().url(connectHost + "/connector-plugins").build();
       try (Response response = client.newCall(request).execute()) {
-        assert (response.isSuccessful());
-        String results = response.body().string();
-        logger.info("Available connector plugins: " + results);
-        assert (results.contains("solace"));
+        assertTrue(response.isSuccessful());
+        JsonArray results = responseBodyToJson(response.body()).getAsJsonArray();
+        logger.info("Available connector plugins: " + gson.toJson(results));
+        boolean hasConnector = false;
+        for (Iterator<JsonElement> resultsIter = results.iterator(); !hasConnector && resultsIter.hasNext();) {
+          JsonObject connectorPlugin = resultsIter.next().getAsJsonObject();
+          if (connectorPlugin.get("class").getAsString().equals(SolaceSinkConnector.class.getName())) {
+            hasConnector = true;
+            assertEquals("sink", connectorPlugin.get("type").getAsString());
+            assertEquals(VersionUtil.getVersion(), connectorPlugin.get("version").getAsString());
+          }
+        }
+        assertTrue(hasConnector, String.format("Could not find connector %s : %s",
+                SolaceSinkConnector.class.getName(), gson.toJson(results)));
       }
 
       // Delete a running connector, if any
@@ -146,13 +171,12 @@ public class SolaceConnectorDeployment implements TestConstants {
 
       // configure plugin: curl -X POST -H "Content-Type: application/json" -d
       // @solace_source_properties.json http://18.218.82.209:8083/connectors
-      Request configrequest = new Request.Builder().url("http://" + connectorAddress + "/connectors")
+      Request configrequest = new Request.Builder().url(connectHost + "/connectors")
           .post(RequestBody.create(configJson, MediaType.parse("application/json"))).build();
       try (Response configresponse = client.newCall(configrequest).execute()) {
         // if (!configresponse.isSuccessful()) throw new IOException("Unexpected code "
         // + configresponse);
-        String configresults = configresponse.body().string();
-        logger.info("Connector config results: " + configresults);
+        logger.info("Connector config results: " + gson.toJson(responseBodyToJson(configresponse.body())));
       }
       // check success
       AtomicReference<JsonObject> statusResponse = new AtomicReference<>(new JsonObject());
@@ -161,7 +185,13 @@ public class SolaceConnectorDeployment implements TestConstants {
         do {
           connectorStatus = getConnectorStatus();
           statusResponse.set(connectorStatus);
-        } while (!"RUNNING".equals(connectorStatus.getAsJsonObject("connector").get("state").getAsString()));
+        } while (!"RUNNING".equals(Optional.ofNullable(connectorStatus)
+                .map(a -> a.getAsJsonArray("tasks"))
+                .map(a -> a.size() > 0 ? a.get(0) : null)
+                .map(JsonElement::getAsJsonObject)
+                .map(a -> a.get("state"))
+                .map(JsonElement::getAsString)
+                .orElse("")));
       }, () -> "Timed out while waiting for connector to start: " + gson.toJson(statusResponse.get()));
       Thread.sleep(5000); // Give some time to start
     } catch (IOException e) {
@@ -174,7 +204,7 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public void deleteConnector() throws IOException {
     Request request = new Request.Builder()
-            .url("http://" + connectorAddress + "/connectors/solaceSinkConnector").delete().build();
+            .url(connectHost + "/connectors/solaceSinkConnector").delete().build();
     try (Response response = client.newCall(request).execute()) {
       logger.info("Delete response: " + response);
     }
@@ -182,7 +212,7 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public JsonObject getConnectorStatus() {
     Request request = new Request.Builder()
-            .url("http://" + connectorAddress + "/connectors/solaceSinkConnector/status").build();
+            .url(connectHost + "/connectors/solaceSinkConnector/status").build();
     return assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
       while (true) {
         try (Response response = client.newCall(request).execute()) {
@@ -190,14 +220,17 @@ public class SolaceConnectorDeployment implements TestConstants {
             continue;
           }
 
-          return Optional.ofNullable(response.body())
-                  .map(ResponseBody::charStream)
-                  .map(s -> new JsonParser().parse(s))
-                  .map(JsonElement::getAsJsonObject)
-                  .orElseGet(JsonObject::new);
+          return responseBodyToJson(response.body()).getAsJsonObject();
         }
       }
     });
+  }
+
+  private JsonElement responseBodyToJson(ResponseBody responseBody) {
+    return Optional.ofNullable(responseBody)
+            .map(ResponseBody::charStream)
+            .map(s -> new JsonParser().parse(s))
+            .orElseGet(JsonObject::new);
   }
 
 }

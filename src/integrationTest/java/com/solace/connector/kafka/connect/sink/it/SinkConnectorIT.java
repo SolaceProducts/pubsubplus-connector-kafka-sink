@@ -4,12 +4,16 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
+import com.solace.connector.kafka.connect.sink.it.util.testcontainers.BitnamiKafkaContainer;
+import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
+import com.solace.test.integration.testcontainer.PubSubPlusContainer;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SDTException;
@@ -26,11 +30,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.WaitingConsumer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.time.Duration;
@@ -46,32 +53,53 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.fail;
 
-public class SinkConnectorIT extends DockerizedPlatformSetupApache implements TestConstants {
+@Testcontainers
+public class SinkConnectorIT implements TestConstants {
 
     static Logger logger = LoggerFactory.getLogger(SinkConnectorIT.class.getName());
     // Connectordeployment creates a Kafka topic "kafkaTestTopic", which is used next
-    static SolaceConnectorDeployment connectorDeployment = new SolaceConnectorDeployment();
-    static TestKafkaProducer kafkaProducer = new TestKafkaProducer(connectorDeployment.kafkaTestTopic);
-    static TestSolaceConsumer solaceConsumer = new TestSolaceConsumer();
+    static SolaceConnectorDeployment connectorDeployment;
+    static TestKafkaProducer kafkaProducer;
+    static TestSolaceQueueConsumer solaceQueueConsumer;
+    static TestSolaceTopicConsumer solaceTopicConsumer;
     // Used to request additional verification types
     static enum AdditionalCheck { ATTACHMENTBYTEBUFFER, CORRELATIONID }
+    private static final String DOCKER_NET_PUBSUB_ALIAS = "solace-pubsubplus";
+
+    @Container
+    public static final BitnamiKafkaContainer KAFKA_CONTAINER = new BitnamiKafkaContainer();
+
+    @RegisterExtension
+    public static final PubSubPlusExtension PUB_SUB_PLUS_EXTENSION = new PubSubPlusExtension(() ->
+            new PubSubPlusContainer()
+                    .withNetwork(KAFKA_CONTAINER.getNetwork())
+                    .withNetworkAliases(DOCKER_NET_PUBSUB_ALIAS));
 
     ////////////////////////////////////////////////////
     // Main setup/teardown
 
     @BeforeAll
-    static void setUp() {
-         try {
-             connectorDeployment.waitForConnectorRestIFUp();
-             connectorDeployment.startAdminClient();
-             // Start consumer
-             // Ensure test queue exists on PubSub+
-            solaceConsumer.initialize();
-            solaceConsumer.provisionQueue(SOL_QUEUE);
-            solaceConsumer.start();
+    static void setUp(JCSMPSession jcsmpSession, JCSMPProperties jcsmpProperties) {
+        String bootstrapHost = String.format("%s:%s", KAFKA_CONTAINER.getHost(),
+                KAFKA_CONTAINER.getMappedPort(BitnamiKafkaContainer.BOOTSTRAP_LISTENER_PORT));
+        kafkaProducer = new TestKafkaProducer(bootstrapHost, SolaceConnectorDeployment.kafkaTestTopic);
+        connectorDeployment = new SolaceConnectorDeployment(
+                String.format("http://%s:%s", KAFKA_CONTAINER.getHost(),
+                        KAFKA_CONTAINER.getMappedPort(BitnamiKafkaContainer.CONNECT_PORT)),
+                bootstrapHost, String.format("tcp://%s:55555", DOCKER_NET_PUBSUB_ALIAS), jcsmpProperties);
+        try {
+            connectorDeployment.waitForConnectorRestIFUp();
+            connectorDeployment.startAdminClient();
+            // Start consumer
+            // Ensure test queue exists on PubSub+
+            solaceTopicConsumer = new TestSolaceTopicConsumer(jcsmpSession);
+            solaceTopicConsumer.start();
+            solaceQueueConsumer = new TestSolaceQueueConsumer(jcsmpSession);
+            solaceQueueConsumer.provisionQueue(SOL_QUEUE);
+            solaceQueueConsumer.start();
             Thread.sleep(1000L);
         } catch (JCSMPException | InterruptedException e1) {
             e1.printStackTrace();
@@ -86,7 +114,8 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
 
     @AfterAll
     static void cleanUp() {
-        solaceConsumer.stop();
+        solaceTopicConsumer.close();
+        solaceQueueConsumer.close();
         connectorDeployment.closeAdminClient();
     }
 
@@ -119,8 +148,8 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
     void clearReceivedMessages() {
         // Clean catch queues first
         // TODO: fix possible concurrency issue with cleaning/wring the queue later
-        TestSolaceConsumer.solaceReceivedQueueMessages.clear();
-        TestSolaceConsumer.solaceReceivedTopicMessages.clear();
+        TestSolaceQueueConsumer.solaceReceivedQueueMessages.clear();
+        TestSolaceTopicConsumer.solaceReceivedTopicMessages.clear();
     }
 
     RecordMetadata sendMessagetoKafka(String kafkaKey, String kafkaValue) {
@@ -136,14 +165,14 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
 
         // Wait for PubSub+ to report messages - populate queue and topics if provided
         if (expectedSolaceQueue != null) {
-            BytesXMLMessage queueMessage = TestSolaceConsumer.solaceReceivedQueueMessages.poll(30,TimeUnit.SECONDS);
+            BytesXMLMessage queueMessage = TestSolaceQueueConsumer.solaceReceivedQueueMessages.poll(30,TimeUnit.SECONDS);
             assertNotNull(queueMessage);
             receivedMessages.add(queueMessage);
         } else {
-            assert(TestSolaceConsumer.solaceReceivedQueueMessages.size() == 0);
+            assert(TestSolaceQueueConsumer.solaceReceivedQueueMessages.size() == 0);
         }
         for(String s : expectedSolaceTopics) {
-            BytesXMLMessage newTopicMessage = TestSolaceConsumer.solaceReceivedTopicMessages.poll(5,TimeUnit.SECONDS);
+            BytesXMLMessage newTopicMessage = TestSolaceTopicConsumer.solaceReceivedTopicMessages.poll(5,TimeUnit.SECONDS);
             assertNotNull(newTopicMessage);
             receivedMessages.add(newTopicMessage);
         }
@@ -423,12 +452,10 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
 
         @ParameterizedTest(name = "[{index}] autoFlush={0}")
         @ValueSource(booleans = { true, false })
-        void testCommitRollback(boolean autoFlush) throws Exception {
+        void testCommitRollback(boolean autoFlush, JCSMPSession jcsmpSession, SempV2Api sempV2Api) throws Exception {
             Queue queue = JCSMPFactory.onlyInstance().createQueue(RandomStringUtils.randomAlphanumeric(100));
-            TestSolaceConsumer solaceConsumer1 = new TestSolaceConsumer();
-            solaceConsumer1.initialize();
 
-            try {
+            try (TestSolaceQueueConsumer solaceConsumer1 = new TestSolaceQueueConsumer(jcsmpSession)) {
                 EndpointProperties endpointProperties = new EndpointProperties();
                 endpointProperties.setMaxMsgSize(1);
                 solaceConsumer1.provisionQueue(queue.getName(), endpointProperties);
@@ -446,7 +473,7 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                 RecordMetadata recordMetadata = sendMessagetoKafka(RandomStringUtils.randomAlphanumeric(100), recordValue);
 
                 WaitingConsumer logConsumer = new WaitingConsumer();
-                KAFKA_CONNECT_REST.followOutput(logConsumer);
+                KAFKA_CONTAINER.followOutput(logConsumer);
                 logConsumer.waitUntil(frame -> frame.getUtf8String()
                         .contains("Document Is Too Large"), 30, TimeUnit.SECONDS);
                 if (autoFlush) {
@@ -461,13 +488,10 @@ public class SinkConnectorIT extends DockerizedPlatformSetupApache implements Te
                 Assertions.assertEquals("RUNNING",
                         connectorDeployment.getConnectorStatus().getAsJsonArray("tasks").get(0).getAsJsonObject().get("state").getAsString());
 
-                new SempV2Api("http://" + new TestConfigProperties().getProperty("sol.host") + ":8080", "admin", "admin")
-                        .config()
-                        .updateMsgVpnQueue(SOL_VPN, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(10000000), null);
+                sempV2Api.config().updateMsgVpnQueue(SOL_VPN, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(10000000), null);
                 assertMessageReceived(queue.getName(), new String[0], recordMetadata, ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, recordValue));
             } finally {
-                solaceConsumer1.getSession().deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
-                solaceConsumer1.stop();
+                jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
             }
         }
     }
