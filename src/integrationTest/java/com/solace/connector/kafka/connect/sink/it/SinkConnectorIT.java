@@ -4,7 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
-import com.solace.connector.kafka.connect.sink.it.util.testcontainers.BitnamiKafkaContainer;
+import com.solace.connector.kafka.connect.sink.it.util.KafkaConnection;
+import com.solace.connector.kafka.connect.sink.it.util.testcontainers.BitnamiKafkaConnectContainer;
+import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaConnectContainer;
+import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaControlCenterContainer;
+import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaSchemaRegistryContainer;
+import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
+import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
@@ -18,7 +24,6 @@ import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -30,24 +35,31 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
+import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -57,25 +69,44 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @Testcontainers
+@ExtendWith(ExecutorServiceExtension.class)
 public class SinkConnectorIT implements TestConstants {
 
     static Logger logger = LoggerFactory.getLogger(SinkConnectorIT.class.getName());
     // Connectordeployment creates a Kafka topic "kafkaTestTopic", which is used next
+    static KafkaConnection kafkaConnection;
     static SolaceConnectorDeployment connectorDeployment;
     static TestKafkaProducer kafkaProducer;
     static TestSolaceQueueConsumer solaceQueueConsumer;
     static TestSolaceTopicConsumer solaceTopicConsumer;
     // Used to request additional verification types
     static enum AdditionalCheck { ATTACHMENTBYTEBUFFER, CORRELATIONID }
+    private static final Network DOCKER_NET = Network.newNetwork();
     private static final String DOCKER_NET_PUBSUB_ALIAS = "solace-pubsubplus";
 
     @Container
-    public static final BitnamiKafkaContainer KAFKA_CONTAINER = new BitnamiKafkaContainer();
+    public static final BitnamiKafkaConnectContainer BITNAMI_KAFKA_CONTAINER = new BitnamiKafkaConnectContainer()
+            .withNetwork(DOCKER_NET);
+
+//    @Container
+//    public static final KafkaContainer CP_KAFKA_CONTAINER = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka").withTag("6.2.1"))
+//            .withNetwork(DOCKER_NET)
+//            .withNetworkAliases("kafka");
+//
+//    @Container
+//    public static final ConfluentKafkaSchemaRegistryContainer CP_SCHEMA_REGISTRY_CONTAINER = new ConfluentKafkaSchemaRegistryContainer(CP_KAFKA_CONTAINER)
+//            .withNetworkAliases("schema-registry");
+//
+//    @Container
+//    public static final ConfluentKafkaControlCenterContainer CP_CONTROL_CENTER_CONTAINER = new ConfluentKafkaControlCenterContainer(CP_KAFKA_CONTAINER, CP_SCHEMA_REGISTRY_CONTAINER);
+//
+//    @Container
+//    public static final ConfluentKafkaConnectContainer CP_CONNECT_CONTAINER = new ConfluentKafkaConnectContainer(CP_KAFKA_CONTAINER, CP_SCHEMA_REGISTRY_CONTAINER);
 
     @RegisterExtension
     public static final PubSubPlusExtension PUB_SUB_PLUS_EXTENSION = new PubSubPlusExtension(() ->
             new PubSubPlusContainer()
-                    .withNetwork(KAFKA_CONTAINER.getNetwork())
+                    .withNetwork(DOCKER_NET)
                     .withNetworkAliases(DOCKER_NET_PUBSUB_ALIAS));
 
     ////////////////////////////////////////////////////
@@ -83,13 +114,11 @@ public class SinkConnectorIT implements TestConstants {
 
     @BeforeAll
     static void setUp(JCSMPSession jcsmpSession, JCSMPProperties jcsmpProperties) {
-        String bootstrapHost = String.format("%s:%s", KAFKA_CONTAINER.getHost(),
-                KAFKA_CONTAINER.getMappedPort(BitnamiKafkaContainer.BOOTSTRAP_LISTENER_PORT));
-        kafkaProducer = new TestKafkaProducer(bootstrapHost, SolaceConnectorDeployment.kafkaTestTopic);
-        connectorDeployment = new SolaceConnectorDeployment(
-                String.format("http://%s:%s", KAFKA_CONTAINER.getHost(),
-                        KAFKA_CONTAINER.getMappedPort(BitnamiKafkaContainer.CONNECT_PORT)),
-                bootstrapHost, String.format("tcp://%s:55555", DOCKER_NET_PUBSUB_ALIAS), jcsmpProperties);
+        kafkaConnection = new KafkaConnection(BITNAMI_KAFKA_CONTAINER.getBootstrapServers(), BITNAMI_KAFKA_CONTAINER.getConnectUrl(), BITNAMI_KAFKA_CONTAINER, BITNAMI_KAFKA_CONTAINER);
+//        kafkaConnection = new KafkaConnection(CP_KAFKA_CONTAINER.getBootstrapServers(), CP_CONNECT_CONTAINER.getConnectUrl(), CP_KAFKA_CONTAINER, CP_CONNECT_CONTAINER);
+        kafkaProducer = new TestKafkaProducer(kafkaConnection.getBootstrapServers(), SolaceConnectorDeployment.kafkaTestTopic);
+        connectorDeployment = new SolaceConnectorDeployment(kafkaConnection,
+                String.format("tcp://%s:55555", DOCKER_NET_PUBSUB_ALIAS), jcsmpProperties);
         try {
             connectorDeployment.waitForConnectorRestIFUp();
             connectorDeployment.startAdminClient();
@@ -165,7 +194,7 @@ public class SinkConnectorIT implements TestConstants {
 
         // Wait for PubSub+ to report messages - populate queue and topics if provided
         if (expectedSolaceQueue != null) {
-            BytesXMLMessage queueMessage = TestSolaceQueueConsumer.solaceReceivedQueueMessages.poll(30,TimeUnit.SECONDS);
+            BytesXMLMessage queueMessage = TestSolaceQueueConsumer.solaceReceivedQueueMessages.poll(5,TimeUnit.MINUTES);
             assertNotNull(queueMessage);
             receivedMessages.add(queueMessage);
         } else {
@@ -436,8 +465,8 @@ public class SinkConnectorIT implements TestConstants {
         @Test
         void testFailPubSubConnection() {
             Properties prop = new Properties();
-            prop.setProperty("sol.vpn_name", RandomStringUtils.randomAlphanumeric(10));
-            connectorDeployment.startConnector(prop);
+            prop.setProperty("sol.vpn_name", randomAlphanumeric(10));
+            connectorDeployment.startConnector(prop, true);
             AtomicReference<JsonObject> connectorStatus = new AtomicReference<>(new JsonObject());
             assertTimeoutPreemptively(Duration.ofMinutes(1), () -> {
                 JsonObject taskStatus;
@@ -452,8 +481,10 @@ public class SinkConnectorIT implements TestConstants {
 
         @ParameterizedTest(name = "[{index}] autoFlush={0}")
         @ValueSource(booleans = { true, false })
-        void testCommitRollback(boolean autoFlush, JCSMPSession jcsmpSession, SempV2Api sempV2Api) throws Exception {
-            Queue queue = JCSMPFactory.onlyInstance().createQueue(RandomStringUtils.randomAlphanumeric(100));
+        void testCommitRollback(boolean autoFlush, JCSMPSession jcsmpSession, SempV2Api sempV2Api,
+                                @ExecSvc(poolSize = 2, scheduled = true) ScheduledExecutorService executorService)
+                throws Exception {
+            Queue queue = JCSMPFactory.onlyInstance().createQueue(randomAlphanumeric(100));
 
             try (TestSolaceQueueConsumer solaceConsumer1 = new TestSolaceQueueConsumer(jcsmpSession)) {
                 EndpointProperties endpointProperties = new EndpointProperties();
@@ -469,11 +500,12 @@ public class SinkConnectorIT implements TestConstants {
                 connectorDeployment.startConnector(prop);
 
                 clearReceivedMessages();
-                String recordValue = RandomStringUtils.randomAlphanumeric(100);
-                RecordMetadata recordMetadata = sendMessagetoKafka(RandomStringUtils.randomAlphanumeric(100), recordValue);
+                String recordValue = randomAlphanumeric(100);
+                Future<RecordMetadata> recordMetadata = executorService.schedule(() ->
+                        sendMessagetoKafka(randomAlphanumeric(100), recordValue), 5, TimeUnit.SECONDS);
 
                 WaitingConsumer logConsumer = new WaitingConsumer();
-                KAFKA_CONTAINER.followOutput(logConsumer);
+                kafkaConnection.getConnectContainer().followOutput(logConsumer);
                 logConsumer.waitUntil(frame -> frame.getUtf8String()
                         .contains("Document Is Too Large"), 30, TimeUnit.SECONDS);
                 if (autoFlush) {
@@ -481,7 +513,7 @@ public class SinkConnectorIT implements TestConstants {
                             .contains("RetriableException from SinkTask"), 30, TimeUnit.SECONDS);
                 } else {
                     logConsumer.waitUntil(frame -> frame.getUtf8String()
-                            .contains("Offset commit failed, rewinding to last committed offsets"), 30, TimeUnit.SECONDS);
+                            .contains("Offset commit failed, rewinding to last committed offsets"), 1, TimeUnit.MINUTES);
                 }
                 Thread.sleep(5000);
 
@@ -489,7 +521,8 @@ public class SinkConnectorIT implements TestConstants {
                         connectorDeployment.getConnectorStatus().getAsJsonArray("tasks").get(0).getAsJsonObject().get("state").getAsString());
 
                 sempV2Api.config().updateMsgVpnQueue(SOL_VPN, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(10000000), null);
-                assertMessageReceived(queue.getName(), new String[0], recordMetadata, ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, recordValue));
+                assertMessageReceived(queue.getName(), new String[0], recordMetadata.get(30, TimeUnit.SECONDS),
+                        ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, recordValue));
             } finally {
                 jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
             }

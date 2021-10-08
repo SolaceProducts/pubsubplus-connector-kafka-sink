@@ -13,7 +13,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 
-public class BitnamiKafkaContainer extends GenericContainer<BitnamiKafkaContainer> {
+public class BitnamiKafkaConnectContainer extends GenericContainer<BitnamiKafkaConnectContainer> {
 	private static final String BROKER_LISTENER_NAME = "PLAINTEXT";
 	private static final int BROKER_LISTENER_PORT = 9092;
 	private static final String BOOTSTRAP_LISTENER_NAME = "PLAINTEXT_HOST";
@@ -26,15 +26,15 @@ public class BitnamiKafkaContainer extends GenericContainer<BitnamiKafkaContaine
 	private DockerImageName zookeeperDockerImageName = DockerImageName.parse("bitnami/zookeeper:3");
 	private GenericContainer<?> zookeeperContainer;
 
-	public BitnamiKafkaContainer() {
+	public BitnamiKafkaConnectContainer() {
 		this(DEFAULT_IMAGE_NAME.withTag(DEFAULT_IMAGE_TAG));
 	}
 
-	public BitnamiKafkaContainer(String dockerImageName) {
+	public BitnamiKafkaConnectContainer(String dockerImageName) {
 		this(DockerImageName.parse(dockerImageName));
 	}
 
-	public BitnamiKafkaContainer(DockerImageName dockerImageName) {
+	public BitnamiKafkaConnectContainer(DockerImageName dockerImageName) {
 		super(dockerImageName);
 
 		withNetwork(Network.newNetwork());
@@ -97,7 +97,15 @@ public class BitnamiKafkaContainer extends GenericContainer<BitnamiKafkaContaine
 		}
 	}
 
-	public BitnamiKafkaContainer withZookeeper(DockerImageName dockerImageName) {
+	public String getBootstrapServers() {
+		return String.format("%s:%s", getHost(), getMappedPort(BitnamiKafkaConnectContainer.BOOTSTRAP_LISTENER_PORT));
+	}
+
+	public String getConnectUrl() {
+		return String.format("http://%s:%s", getHost(), getMappedPort(BitnamiKafkaConnectContainer.CONNECT_PORT));
+	}
+
+	public BitnamiKafkaConnectContainer withZookeeper(DockerImageName dockerImageName) {
 		zookeeperDockerImageName = dockerImageName;
 		return this;
 	}

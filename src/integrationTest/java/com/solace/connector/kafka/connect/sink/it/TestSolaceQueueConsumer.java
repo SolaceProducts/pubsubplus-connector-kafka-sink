@@ -37,7 +37,7 @@ public class TestSolaceQueueConsumer implements AutoCloseable {
         final Queue queue = JCSMPFactory.onlyInstance().createQueue(queueName);
         // Provision queue in case it doesn't exist, and do not fail if it already exists
         endpointProps.setPermission(EndpointProperties.PERMISSION_CONSUME);
-        endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
+        endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_NONEXCLUSIVE);
         session.provision(queue, endpointProps, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
         logger.info("Ensured Solace queue " + queueName + " exists.");
     }

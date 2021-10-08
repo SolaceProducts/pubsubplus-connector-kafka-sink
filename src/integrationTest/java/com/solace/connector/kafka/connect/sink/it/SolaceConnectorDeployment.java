@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConnector;
 import com.solace.connector.kafka.connect.sink.VersionUtil;
+import com.solace.connector.kafka.connect.sink.it.util.KafkaConnection;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -49,20 +50,18 @@ public class SolaceConnectorDeployment implements TestConstants {
   static String kafkaTestTopic = KAFKA_SINK_TOPIC + "-" + Instant.now().getEpochSecond();
   OkHttpClient client = new OkHttpClient();
   AdminClient adminClient;
-  private final String connectHost;
-  private final String bootstrapHost;
+  private final KafkaConnection kafkaConnection;
   private final String pubSubPlusHost;
   private final JCSMPProperties jcsmpProperties;
 
-  public SolaceConnectorDeployment(String connectHost, String bootstrapHost, String pubSubPlusHost, JCSMPProperties jcsmpProperties) {
-    this.connectHost = connectHost;
-    this.bootstrapHost = bootstrapHost;
+  public SolaceConnectorDeployment(KafkaConnection kafkaConnection, String pubSubPlusHost, JCSMPProperties jcsmpProperties) {
+    this.kafkaConnection = kafkaConnection;
     this.pubSubPlusHost = pubSubPlusHost;
     this.jcsmpProperties = jcsmpProperties;
   }
 
   public void waitForConnectorRestIFUp() {
-    Request request = new Request.Builder().url(connectHost + "/connector-plugins").build();
+    Request request = new Request.Builder().url(kafkaConnection.getConnectUrl() + "/connector-plugins").build();
     boolean success = false;
     do {
       try {
@@ -79,7 +78,7 @@ public class SolaceConnectorDeployment implements TestConstants {
   public void startAdminClient() {
     if (adminClient == null) {
       Properties properties = new Properties();
-      properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapHost);
+      properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaConnection.getBootstrapServers());
       adminClient = AdminClient.create(properties);
     }
   }
@@ -110,6 +109,10 @@ public class SolaceConnectorDeployment implements TestConstants {
   }
 
   void startConnector(Properties props) {
+    startConnector(props, false);
+  }
+
+  void startConnector(Properties props, boolean expectStartFail) {
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String configJson = null;
     // Prep config files
@@ -148,7 +151,7 @@ public class SolaceConnectorDeployment implements TestConstants {
     try {
       // check presence of Solace plugin: curl
       // http://18.218.82.209:8083/connector-plugins | jq
-      Request request = new Request.Builder().url(connectHost + "/connector-plugins").build();
+      Request request = new Request.Builder().url(kafkaConnection.getConnectUrl() + "/connector-plugins").build();
       try (Response response = client.newCall(request).execute()) {
         assertTrue(response.isSuccessful());
         JsonArray results = responseBodyToJson(response.body()).getAsJsonArray();
@@ -171,7 +174,7 @@ public class SolaceConnectorDeployment implements TestConstants {
 
       // configure plugin: curl -X POST -H "Content-Type: application/json" -d
       // @solace_source_properties.json http://18.218.82.209:8083/connectors
-      Request configrequest = new Request.Builder().url(connectHost + "/connectors")
+      Request configrequest = new Request.Builder().url(kafkaConnection.getConnectUrl() + "/connectors")
           .post(RequestBody.create(configJson, MediaType.parse("application/json"))).build();
       try (Response configresponse = client.newCall(configrequest).execute()) {
         // if (!configresponse.isSuccessful()) throw new IOException("Unexpected code "
@@ -185,7 +188,7 @@ public class SolaceConnectorDeployment implements TestConstants {
         do {
           connectorStatus = getConnectorStatus();
           statusResponse.set(connectorStatus);
-        } while (!"RUNNING".equals(Optional.ofNullable(connectorStatus)
+        } while (!(expectStartFail ? "FAILED" : "RUNNING").equals(Optional.ofNullable(connectorStatus)
                 .map(a -> a.getAsJsonArray("tasks"))
                 .map(a -> a.size() > 0 ? a.get(0) : null)
                 .map(JsonElement::getAsJsonObject)
@@ -204,7 +207,7 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public void deleteConnector() throws IOException {
     Request request = new Request.Builder()
-            .url(connectHost + "/connectors/solaceSinkConnector").delete().build();
+            .url(kafkaConnection.getConnectUrl() + "/connectors/solaceSinkConnector").delete().build();
     try (Response response = client.newCall(request).execute()) {
       logger.info("Delete response: " + response);
     }
@@ -212,7 +215,7 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public JsonObject getConnectorStatus() {
     Request request = new Request.Builder()
-            .url(connectHost + "/connectors/solaceSinkConnector/status").build();
+            .url(kafkaConnection.getConnectUrl() + "/connectors/solaceSinkConnector/status").build();
     return assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
       while (true) {
         try (Response response = client.newCall(request).execute()) {
