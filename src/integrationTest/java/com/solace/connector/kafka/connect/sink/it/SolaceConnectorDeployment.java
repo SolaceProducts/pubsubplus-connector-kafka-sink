@@ -9,7 +9,6 @@ import com.google.gson.JsonParser;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConnector;
 import com.solace.connector.kafka.connect.sink.VersionUtil;
 import com.solace.connector.kafka.connect.sink.it.util.KafkaConnection;
-import com.solacesystems.jcsmp.JCSMPProperties;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -20,7 +19,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
@@ -47,17 +48,14 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   static Logger logger = LoggerFactory.getLogger(SolaceConnectorDeployment.class.getName());
 
-  static String kafkaTestTopic = KAFKA_SINK_TOPIC + "-" + Instant.now().getEpochSecond();
+  public static String kafkaTestTopic = KAFKA_SINK_TOPIC + "-" + Instant.now().getEpochSecond();
   OkHttpClient client = new OkHttpClient();
-  AdminClient adminClient;
+  private final AdminClient adminClient;
   private final KafkaConnection kafkaConnection;
-  private final String pubSubPlusHost;
-  private final JCSMPProperties jcsmpProperties;
 
-  public SolaceConnectorDeployment(KafkaConnection kafkaConnection, String pubSubPlusHost, JCSMPProperties jcsmpProperties) {
+  public SolaceConnectorDeployment(KafkaConnection kafkaConnection, AdminClient adminClient) {
     this.kafkaConnection = kafkaConnection;
-    this.pubSubPlusHost = pubSubPlusHost;
-    this.jcsmpProperties = jcsmpProperties;
+    this.adminClient = adminClient;
   }
 
   public void waitForConnectorRestIFUp() {
@@ -75,21 +73,6 @@ public class SolaceConnectorDeployment implements TestConstants {
     } while (!success);
   }
 
-  public void startAdminClient() {
-    if (adminClient == null) {
-      Properties properties = new Properties();
-      properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaConnection.getBootstrapServers());
-      adminClient = AdminClient.create(properties);
-    }
-  }
-
-  public void closeAdminClient() {
-    if (adminClient != null) {
-      adminClient.close();
-      adminClient = null;
-    }
-  }
-
   public void provisionKafkaTestTopic() {
     // Create a new kafka test topic to use
     NewTopic newTopic = new NewTopic(kafkaTestTopic, 1, (short) 1); // new NewTopic(topicName, numPartitions,
@@ -101,11 +84,15 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public void deleteKafkaTestTopic() throws ExecutionException, InterruptedException, TimeoutException {
     DeleteTopicsResult result = adminClient.deleteTopics(Collections.singleton(kafkaTestTopic));
-    result.all().get(1, TimeUnit.MINUTES);
-  }
-
-  void startConnector() {
-    startConnector(null); // Defaults only, no override
+    for (Map.Entry<String, KafkaFuture<Void>> entry : result.values().entrySet()) {
+      try {
+        entry.getValue().get(1, TimeUnit.MINUTES);
+      } catch (ExecutionException e) {
+        if (!(e.getCause() instanceof UnknownTopicOrPartitionException)) {
+          throw e;
+        }
+      }
+    }
   }
 
   void startConnector(Properties props) {
@@ -125,10 +112,6 @@ public class SolaceConnectorDeployment implements TestConstants {
       JsonElement jconfig = jtree.getAsJsonObject().get("config");
       JsonObject jobject = jconfig.getAsJsonObject();
       // Set properties defaults
-      jobject.addProperty("sol.host", pubSubPlusHost);
-      jobject.addProperty("sol.username", jcsmpProperties.getStringProperty(JCSMPProperties.USERNAME));
-      jobject.addProperty("sol.password", jcsmpProperties.getStringProperty(JCSMPProperties.PASSWORD));
-      jobject.addProperty("sol.vpn_name", jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME));
       jobject.addProperty("topics", kafkaTestTopic);
       jobject.addProperty("sol.topics", SOL_TOPICS);
       jobject.addProperty("sol.autoflush.size", "1");
@@ -137,11 +120,7 @@ public class SolaceConnectorDeployment implements TestConstants {
       jobject.addProperty("value.converter", "org.apache.kafka.connect.converters.ByteArrayConverter");
       jobject.addProperty("key.converter", "org.apache.kafka.connect.storage.StringConverter");
       // Override properties if provided
-      if (props != null) {
-        props.forEach((key, value) -> {
-          jobject.addProperty((String) key, (String) value);
-        });
-      }
+      props.forEach((key, value) -> jobject.addProperty((String) key, (String) value));
       configJson = gson.toJson(jtree);
     } catch (IOException e) {
       e.printStackTrace();

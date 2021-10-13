@@ -5,7 +5,7 @@ import com.solace.test.integration.testcontainer.PubSubPlusContainer;
 import org.testcontainers.containers.Network;
 
 public class NetworkPubSubPlusExtension extends PubSubPlusExtension {
-	private static final Network DOCKER_NET = Network.newNetwork();
+	public static final Network DOCKER_NET = Network.newNetwork();
 	private static final String DOCKER_NET_PUBSUB_ALIAS = "solace-pubsubplus";
 
 	public NetworkPubSubPlusExtension() {
