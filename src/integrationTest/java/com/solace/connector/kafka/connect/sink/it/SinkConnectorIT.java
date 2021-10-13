@@ -5,16 +5,15 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
 import com.solace.connector.kafka.connect.sink.it.util.KafkaConnection;
+import com.solace.connector.kafka.connect.sink.it.util.extensions.NetworkPubSubPlusExtension;
 import com.solace.connector.kafka.connect.sink.it.util.testcontainers.BitnamiKafkaConnectContainer;
 import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaConnectContainer;
 import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaControlCenterContainer;
 import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaSchemaRegistryContainer;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
-import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
-import com.solace.test.integration.testcontainer.PubSubPlusContainer;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -42,7 +41,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
-import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -81,16 +79,17 @@ public class SinkConnectorIT implements TestConstants {
     static TestSolaceTopicConsumer solaceTopicConsumer;
     // Used to request additional verification types
     static enum AdditionalCheck { ATTACHMENTBYTEBUFFER, CORRELATIONID }
-    private static final Network DOCKER_NET = Network.newNetwork();
-    private static final String DOCKER_NET_PUBSUB_ALIAS = "solace-pubsubplus";
+
+    @RegisterExtension
+    public static final NetworkPubSubPlusExtension PUB_SUB_PLUS_EXTENSION = new NetworkPubSubPlusExtension();
 
     @Container
     public static final BitnamiKafkaConnectContainer BITNAMI_KAFKA_CONTAINER = new BitnamiKafkaConnectContainer()
-            .withNetwork(DOCKER_NET);
+            .withNetwork(PUB_SUB_PLUS_EXTENSION.getDockerNetwork());
 
 //    @Container
 //    public static final KafkaContainer CP_KAFKA_CONTAINER = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka").withTag("6.2.1"))
-//            .withNetwork(DOCKER_NET)
+//            .withNetwork(PUB_SUB_PLUS_EXTENSION.getDockerNetwork())
 //            .withNetworkAliases("kafka");
 //
 //    @Container
@@ -103,12 +102,6 @@ public class SinkConnectorIT implements TestConstants {
 //    @Container
 //    public static final ConfluentKafkaConnectContainer CP_CONNECT_CONTAINER = new ConfluentKafkaConnectContainer(CP_KAFKA_CONTAINER, CP_SCHEMA_REGISTRY_CONTAINER);
 
-    @RegisterExtension
-    public static final PubSubPlusExtension PUB_SUB_PLUS_EXTENSION = new PubSubPlusExtension(() ->
-            new PubSubPlusContainer()
-                    .withNetwork(DOCKER_NET)
-                    .withNetworkAliases(DOCKER_NET_PUBSUB_ALIAS));
-
     ////////////////////////////////////////////////////
     // Main setup/teardown
 
@@ -118,7 +111,7 @@ public class SinkConnectorIT implements TestConstants {
 //        kafkaConnection = new KafkaConnection(CP_KAFKA_CONTAINER.getBootstrapServers(), CP_CONNECT_CONTAINER.getConnectUrl(), CP_KAFKA_CONTAINER, CP_CONNECT_CONTAINER);
         kafkaProducer = new TestKafkaProducer(kafkaConnection.getBootstrapServers(), SolaceConnectorDeployment.kafkaTestTopic);
         connectorDeployment = new SolaceConnectorDeployment(kafkaConnection,
-                String.format("tcp://%s:55555", DOCKER_NET_PUBSUB_ALIAS), jcsmpProperties);
+                String.format("tcp://%s:55555", PUB_SUB_PLUS_EXTENSION.getNetworkAlias()), jcsmpProperties);
         try {
             connectorDeployment.waitForConnectorRestIFUp();
             connectorDeployment.startAdminClient();
