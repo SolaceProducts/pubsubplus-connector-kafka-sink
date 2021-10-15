@@ -4,12 +4,12 @@ import com.solace.connector.kafka.connect.sink.SolRecordProcessorIF;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
 import com.solace.connector.kafka.connect.sink.SolaceSinkSender;
 import com.solace.connector.kafka.connect.sink.SolaceSinkTask;
+import com.solace.connector.kafka.connect.sink.it.util.extensions.NetworkPubSubPlusExtension;
 import com.solace.connector.kafka.connect.sink.recordprocessor.SolDynamicDestinationRecordProcessor;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension;
 import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension.LogCaptor;
-import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientProfile;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientUsername;
@@ -61,7 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(LogCaptorExtension.class)
-@ExtendWith(PubSubPlusExtension.class)
+@ExtendWith(NetworkPubSubPlusExtension.class)
 public class SolaceSinkTaskIT {
 	private SolaceSinkTask solaceSinkTask;
 	private Map<String, String> connectorProperties;
