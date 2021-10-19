@@ -34,10 +34,9 @@ public class SolaceSinkConnectorConfigTest {
 	@Test
 	public void shouldReturnConfiguredSolRecordProcessorIFGivenConfigurableClass() {
 		// GIVEN
-		Map<String, String> configProps = new HashMap<>() {{
-			put("processor.config", "dummy");
-			put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, TestSolRecordProcessorIF.class.getName());
-		}};
+		Map<String, String> configProps = new HashMap<>();
+		configProps.put("processor.config", "dummy");
+		configProps.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, TestSolRecordProcessorIF.class.getName());
 
 		// WHEN
 		SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(configProps);
