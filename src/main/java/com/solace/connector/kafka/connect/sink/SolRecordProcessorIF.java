@@ -32,7 +32,7 @@ public interface SolRecordProcessorIF extends Configurable {
    * {@inheritDoc}
    */
   @Override
-  default void configure(final Map<String, ?> configs) { }
+  default void configure(Map<String, ?> configs) { }
 
   /**
    * Converts a record consumed from Kafka into a Solace {@link BytesXMLMessage}.
@@ -41,6 +41,6 @@ public interface SolRecordProcessorIF extends Configurable {
    * @param record  the Kafka record-value.
    * @return        a new {@link BytesXMLMessage}.
    */
-  BytesXMLMessage processRecord(final String skey, final SinkRecord record);
+  BytesXMLMessage processRecord(String skey, SinkRecord record);
 
 }
