@@ -47,19 +47,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SolaceSinkSender {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkSender.class);
 
-  private SolaceSinkConnectorConfig sconfig;
-  private XMLMessageProducer topicProducer;
+  private final SolaceSinkConnectorConfig sconfig;
+  private final XMLMessageProducer topicProducer;
   private XMLMessageProducer queueProducer;
-  private SolSessionHandler sessionHandler;
-  private List<Topic> topics = new ArrayList<Topic>();
+  private final SolSessionHandler sessionHandler;
+  private final List<Topic> topics = new ArrayList<>();
   private Queue solQueue = null;
   private boolean useTxforQueue = false;
-  private SolRecordProcessorIF processor;
-  private String kafkaKey;
-  private AtomicInteger txMsgCounter = new AtomicInteger();
-  private SolaceSinkTask sinkTask;
-  private Map<TopicPartition, OffsetAndMetadata> offsets
-      = new HashMap<TopicPartition, OffsetAndMetadata>();
+  private final SolRecordProcessorIF processor;
+  private final String kafkaKey;
+  private final AtomicInteger txMsgCounter = new AtomicInteger();
+  private final SolaceSinkTask sinkTask;
+  private final Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
 
   /**
    * Class that sends Solace Messages from Kafka Records.
@@ -69,15 +68,17 @@ public class SolaceSinkSender {
    * @param sinkTask Connector Sink Task
    * @throws JCSMPException
    */
-  public SolaceSinkSender(SolaceSinkConnectorConfig sconfig, SolSessionHandler sessionHandler,
-      boolean useTxforQueue, SolaceSinkTask sinkTask) throws JCSMPException {
+  public SolaceSinkSender(final SolaceSinkConnectorConfig sconfig,
+                          final SolSessionHandler sessionHandler,
+                          final boolean useTxforQueue,
+                          final SolaceSinkTask sinkTask) throws JCSMPException {
     this.sconfig = sconfig;
     this.sessionHandler = sessionHandler;
     this.useTxforQueue = useTxforQueue;
     this.sinkTask = sinkTask;
-    kafkaKey = sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
-    topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
-    processor = this.sconfig.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);
+    this.kafkaKey = sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
+    this.topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
+    this.processor = sconfig.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);
   }
 
   /**
