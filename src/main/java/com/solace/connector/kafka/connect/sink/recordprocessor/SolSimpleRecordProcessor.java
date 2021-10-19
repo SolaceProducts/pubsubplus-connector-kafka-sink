@@ -26,6 +26,8 @@ import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
@@ -37,7 +39,7 @@ public class SolSimpleRecordProcessor implements SolRecordProcessorIF {
   @Override
   public BytesXMLMessage processRecord(String skey, SinkRecord record) {
     BytesXMLMessage msg = JCSMPFactory.onlyInstance().createMessage(BytesXMLMessage.class);
-    
+
     // Add Record Topic,Partition,Offset to Solace Msg
     String kafkaTopic = record.topic();
     SDTMap userHeader = JCSMPFactory.onlyInstance().createMap();
@@ -46,12 +48,12 @@ public class SolSimpleRecordProcessor implements SolRecordProcessorIF {
       userHeader.putInteger("k_partition", record.kafkaPartition());
       userHeader.putLong("k_offset", record.kafkaOffset());
     } catch (SDTException e) {
-      log.info("Received Solace SDTException {}, with the following: {} ", 
+      log.info("Received Solace SDTException {}, with the following: {} ",
           e.getCause(), e.getStackTrace());
     }
     msg.setProperties(userHeader);
     msg.setApplicationMessageType("ResendOfKafkaTopic: " + kafkaTopic);
-    
+
     Schema valueSchema = record.valueSchema();
     Object recordValue = record.value();
     // get message body details from record
@@ -63,7 +65,7 @@ public class SolSimpleRecordProcessor implements SolRecordProcessorIF {
         } else if (recordValue instanceof ByteBuffer) {
           msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
         } else if (recordValue instanceof String) {
-          msg.writeAttachment(((String) recordValue).getBytes());
+          msg.writeAttachment(((String) recordValue).getBytes(StandardCharsets.UTF_8));
         } else {
           // Unknown recordValue type
           msg.reset();
@@ -75,16 +77,16 @@ public class SolSimpleRecordProcessor implements SolRecordProcessorIF {
           msg.writeAttachment((byte[]) ((ByteBuffer) recordValue).array());
         }
       } else if (valueSchema.type() == Schema.Type.STRING) {
-        msg.writeAttachment(((String) recordValue).getBytes());
+        msg.writeAttachment(((String) recordValue).getBytes(StandardCharsets.UTF_8));
       } else {
-        // Do nothing in all other cases 
+        // Do nothing in all other cases
         msg.reset();
       }
     } else {
       // Invalid message
       msg.reset();
     }
-    
+
     return msg;
   }
 

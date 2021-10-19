@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 public class SolaceSinkConnectorConfig extends AbstractConfig {
 
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkConnectorConfig.class);
-  
+
   /**
    * Create Solace Configuration Properties from JSON or Properties file.
    * @param properties returns Properties
@@ -48,21 +48,24 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
    */
   public static ConfigDef solaceConfigDef() {
     return new ConfigDef()
-        .define(SolaceSinkConstants.SOL_USERNAME, 
+        .define(SolaceSinkConstants.SOL_USERNAME,
             Type.STRING, "default", Importance.HIGH, "Solace username")
-        .define(SolaceSinkConstants.SOL_PASSWORD, 
-            Type.STRING, "default", Importance.HIGH, "Solace user password")
+        .define(SolaceSinkConstants.SOL_PASSWORD,
+            Type.PASSWORD, "default", Importance.HIGH, "Solace user password")
         .define(SolaceSinkConstants.SOL_HOST, Type.STRING, null, Importance.HIGH,
             "host to connect with, can be comma delimited for HA/DR")
         .define(SolaceSinkConstants.SOL_VPN_NAME, Type.STRING, "default", Importance.HIGH,
             "Solace VPN to connect with ")
         .define(SolaceSinkConstants.SOL_TOPICS, Type.STRING, null, Importance.MEDIUM,
             "Solace topic or list of topics to subscribe from")
-        .define(SolaceSinkConstants.SOl_QUEUE, 
+        .define(SolaceSinkConstants.SOl_QUEUE,
             Type.STRING, null, Importance.MEDIUM, "Solace queue to consume from")
-        .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR, 
+        .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR,
             Type.CLASS, SolRecordProcessorIF.class, Importance.HIGH,
             "default Solace message processor to use against Kafka Sink Records")
+        .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR,
+            Type.BOOLEAN, false, Importance.MEDIUM,
+            "If enabled, records that throw record processor errors will be discarded")
         .define(SolaceSinkConstants.SOL_LOCALHOST, Type.STRING, null, Importance.LOW,
             "The hostname or IP address of the machine on which the application "
             + "is running. On a multihomed machine, it is strongly recommended "
@@ -75,104 +78,104 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_REAPPLY_SUBSCRIPTIONS, Type.BOOLEAN, true, Importance.LOW,
             "If enabled, the API maintains a local cache of subscriptions "
             + "and reapplies them when the subscriber connection is reestablished")
-        .define(SolaceSinkConstants.SOL_GENERATE_SEND_TIMESTAMPS, 
+        .define(SolaceSinkConstants.SOL_GENERATE_SEND_TIMESTAMPS,
             Type.BOOLEAN, false, Importance.LOW,
             "indicates whether to generate a send timestamp in outgoing messages")
-        .define(SolaceSinkConstants.SOL_GENERATE_RCV_TIMESTAMPS, 
+        .define(SolaceSinkConstants.SOL_GENERATE_RCV_TIMESTAMPS,
             Type.BOOLEAN, false, Importance.LOW,
             "Indicates whether to generate a receive timestamp on incoming messages")
-        .define(SolaceSinkConstants.SOL_GENERATE_SEQUENCE_NUMBERS, 
+        .define(SolaceSinkConstants.SOL_GENERATE_SEQUENCE_NUMBERS,
             Type.BOOLEAN, false, Importance.LOW,
             "Indicates whether to generate a sequence number in outgoing messages")
-        .define(SolaceSinkConstants.SOL_CALCULATE_MESSAGE_EXPIRATION, 
+        .define(SolaceSinkConstants.SOL_CALCULATE_MESSAGE_EXPIRATION,
             Type.BOOLEAN, false, Importance.LOW,
             "Indicates whether to calculate message expiration time in "
             + "outgoing messages and incoming messages")
         .define(SolaceSinkConstants.SOL_PUB_MULTI_THREAD, Type.BOOLEAN, true, Importance.LOW,
             "If enabled (default), the XMLMessageProducer is safe to access from multiple threads")
-        .define(SolaceSinkConstants.SOL_PUB_USE_INTERMEDIATE_DIRECT_BUF, 
+        .define(SolaceSinkConstants.SOL_PUB_USE_INTERMEDIATE_DIRECT_BUF,
             Type.BOOLEAN, true, Importance.LOW,
             "If enabled, during send operations, the XMLMessageProducer "
             + "concatenates all published data. This can result in higher throughput "
             + "for certain send operations. It can, however, lead to performance "
             + "degradation for some scenarios with large messages")
-        .define(SolaceSinkConstants.SOL_MESSAGE_CALLBACK_ON_REACTOR, 
+        .define(SolaceSinkConstants.SOL_MESSAGE_CALLBACK_ON_REACTOR,
             Type.BOOLEAN, false, Importance.LOW,
             "If enabled, messages delivered asynchronously to an XMLMessageListener are "
             + "delivered directly from the I/O thread instead of a consumer notification thread. "
             + "An application making use of this setting MUST return quickly from the "
             + "onReceive() callback, and MUST NOT call ANY session methods from the I/O thread")
-        .define(SolaceSinkConstants.SOL_IGNORE_DUPLICATE_SUBSCRIPTION_ERROR, 
+        .define(SolaceSinkConstants.SOL_IGNORE_DUPLICATE_SUBSCRIPTION_ERROR,
             Type.BOOLEAN, false, Importance.LOW,
             "ignore errors caused by subscriptions being already presents")
-        .define(SolaceSinkConstants.SOL_IGNORE_SUBSCRIPTION_NOT_FOUND_ERROR, 
+        .define(SolaceSinkConstants.SOL_IGNORE_SUBSCRIPTION_NOT_FOUND_ERROR,
             Type.BOOLEAN, false, Importance.LOW,
             "When removing subscriptions ignore errors caused by subscriptions not being found.")
         .define(SolaceSinkConstants.SOL_NO_LOCAL, Type.BOOLEAN, false, Importance.LOW,
             "If this property is true, messages published on the session will not be "
             + "received on the same session even if the client has a subscription "
             + "that matches the published topic.")
-        .define(SolaceSinkConstants.SOL_SUB_ACK_WINDOW_SIZE, 
+        .define(SolaceSinkConstants.SOL_SUB_ACK_WINDOW_SIZE,
             Type.INT, 255, Importance.LOW,
             "The size of the sliding subscriber ACK window. The valid range is 1-255")
-        .define(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE, 
+        .define(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE,
             Type.INT, 200, Importance.LOW,
             "Number of outstanding transacted messages before autoflush. Must be lower than "
             + "max PubSub+ transaction size (255). The valid range is 1-200")
-        .define(SolaceSinkConstants.SOl_AUTHENTICATION_SCHEME, 
+        .define(SolaceSinkConstants.SOl_AUTHENTICATION_SCHEME,
             Type.STRING, "AUTHENTICATION_SCHEME_BASIC",
             Importance.MEDIUM, "String property specifying the authentication scheme.")
-        .define(SolaceSinkConstants.SOL_KRB_SERVICE_NAME, 
+        .define(SolaceSinkConstants.SOL_KRB_SERVICE_NAME,
             Type.STRING, "solace", Importance.MEDIUM,
             "This property is used to specify the ServiceName portion of the "
             + "Service Principal Name (SPN) that has a format of ServiceName/ApplianceName@REALM.")
-        .define(SolaceSinkConstants.SOL_SSL_CONNECTION_DOWNGRADE_TO, 
+        .define(SolaceSinkConstants.SOL_SSL_CONNECTION_DOWNGRADE_TO,
             Type.STRING, "", Importance.MEDIUM,
             "Session property specifying a transport protocol that SSL session "
             + "connection will be downgraded to after client authentication. "
             + "Allowed values: TRANSPORT_PROTOCOL_PLAIN_TEXT.")
-        .define(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, 
+        .define(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE,
             Type.BOOLEAN, true, Importance.LOW,
             "Specifies if writing messages to queue destination shall use transactions.")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectTimeoutInMillis, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectTimeoutInMillis,
             Type.INT, 30000, Importance.MEDIUM,
             "Timeout value (in ms) for creating an initial connection to Solace")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_readTimeoutInMillis, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_readTimeoutInMillis,
             Type.INT, 10000, Importance.MEDIUM,
             "Timeout value (in ms) for reading a reply from Solace")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectRetries, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectRetries,
             Type.INT, 0, Importance.MEDIUM,
             "The number of times to attempt and retry a connection to the host appliance "
             + "(or list of appliances) during initial connection setup")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetries, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetries,
             Type.INT, 0, Importance.MEDIUM,
             "The number of times to attempt to reconnect to the appliance "
             + "(or list of appliances) after an initial connected session goes down")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectRetriesPerHost, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectRetriesPerHost,
             Type.INT, 0, Importance.MEDIUM,
             "This property defines how many times to try to connect or reconnect to a "
             + "single host before moving to the next host in the list")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetryWaitInMillis, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetryWaitInMillis,
             Type.INT, 3000, Importance.MEDIUM,
             "How much time in (MS) to wait between each attempt to connect or reconnect to a host")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_keepAliveIntervalInMillis, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_keepAliveIntervalInMillis,
             Type.INT, 3000, Importance.MEDIUM,
             "The amount of time (in ms) to wait between sending out keep-alive messages")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_keepAliveLimit, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_keepAliveLimit,
             Type.INT, 10, Importance.MEDIUM,
             "The maximum number of consecutive keep-alive messages that can be sent "
             + "without receiving a response before the connection is closed by the API")
         .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_sendBuffer,
             Type.INT, 65536, Importance.MEDIUM,
             "The size (in bytes) of the send socket buffer.")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_receiveBuffer, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_receiveBuffer,
             Type.INT, 65536, Importance.MEDIUM,
             "The size (in bytes) of the receive socket buffer.")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_tcpNoDelay, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_tcpNoDelay,
             Type.BOOLEAN, true, Importance.LOW,
             "Whether to set the TCP_NODELAY option. When enabled, this "
             + "option disables the Nagle's algorithm.")
-        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_compressionLevel, 
+        .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_compressionLevel,
             Type.INT, 0, Importance.MEDIUM,
             "A compressionLevel setting of 1-9 sets the ZLIB compression level to use; "
             + "a setting of 0 disables compression entirely.")
@@ -194,47 +197,47 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_SSL_CIPHER_SUITES, Type.STRING, "", Importance.LOW,
             "This property is used to specify a comma separated list of "
             + "cipher suites in order of preference used for SSL connections. ")
-        .define(SolaceSinkConstants.SOL_SSL_VALIDATE_CERTIFICATE, 
+        .define(SolaceSinkConstants.SOL_SSL_VALIDATE_CERTIFICATE,
             Type.BOOLEAN, true, Importance.LOW,
             "This property is used to specify whether the API should validate server certificates ")
-        .define(SolaceSinkConstants.SOL_SSL_VALIDATE_CERTIFICATE_DATE, 
+        .define(SolaceSinkConstants.SOL_SSL_VALIDATE_CERTIFICATE_DATE,
             Type.BOOLEAN, true, Importance.LOW,
             "This property is used to specify whether the API should validate "
             + "server certificate's expiry")
-        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE, 
+        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE,
             Type.STRING, "/lib/security/jssecacerts", Importance.LOW,
             "This property is used to specify the truststore file to use in URL or path format.")
-        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE_PASSWORD, Type.STRING, "", Importance.LOW,
+        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE_PASSWORD, Type.PASSWORD, "", Importance.LOW,
             "This property is used to specify the password of the truststore "
             + "given in SSL_TRUST_STORE")
-        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE_FORMAT, 
+        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE_FORMAT,
             Type.STRING, "JKS", Importance.LOW,
             "This property is used to specify the format of the truststore "
             + "given in SSL_TRUST_STORE.")
-        .define(SolaceSinkConstants.SOL_SSL_TRUSTED_COMMON_NAME_LIST, 
+        .define(SolaceSinkConstants.SOL_SSL_TRUSTED_COMMON_NAME_LIST,
             Type.STRING, "", Importance.LOW,
             "This property is used to specify a comma separated list of acceptable "
             + "common names for matching with server certificates.")
         .define(SolaceSinkConstants.SOL_SSL_KEY_STORE, Type.STRING, "", Importance.LOW,
             "This property is used to specify the keystore file to use in URL or path format.")
-        .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_PASSWORD, Type.STRING, "", Importance.LOW,
+        .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_PASSWORD, Type.PASSWORD, "", Importance.LOW,
             "This property is used to specify the password of the "
             + "keystore specified by SSL_KEY_STORE.")
         .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_FORMAT, Type.STRING, "JKS", Importance.LOW,
             "This property is used to specify the format of the keystore given in SSL_KEY_STORE.")
-        .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_NORMALIZED_FORMAT, 
+        .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_NORMALIZED_FORMAT,
             Type.STRING, "JKS", Importance.LOW,
             "This property is used to specify the format of an internal normalized "
             + "representation of the keystore if it needs to be different from the default format.")
-        .define(SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_ALIAS, 
+        .define(SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_ALIAS,
             Type.STRING, "", Importance.LOW,
             "This property is used to specify the alias of the private key to use "
             + "for client certificate authentication.")
-        .define(SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_PASSWORD, 
-            Type.STRING, "", Importance.LOW,
+        .define(SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_PASSWORD,
+            Type.PASSWORD, "", Importance.LOW,
             "This property is used to specify the password that deciphers "
             + "the private key from the key store.")
-        .define(SolaceSinkConstants.SOL_ACK_EVENT_MODE, 
+        .define(SolaceSinkConstants.SOL_ACK_EVENT_MODE,
             Type.STRING, "SUPPORTED_ACK_EVENT_MODE_WINDOWED",
             Importance.MEDIUM,
             "API sends out message acknowledgement event for Guaranteed Messages,"
