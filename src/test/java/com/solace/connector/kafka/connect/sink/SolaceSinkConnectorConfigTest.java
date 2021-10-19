@@ -40,7 +40,7 @@ public class SolaceSinkConnectorConfigTest {
         SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(configProps);
 
         // THEN
-        SolRecordProcessorIF processor = config.getSolRecordProcessor();
+        SolRecordProcessorIF processor = config.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);;
         Assert.assertNotNull(processor);
         Assert.assertNotNull(((TestSolRecordProcessorIF)processor).configs);
         Assert.assertEquals("dummy", ((TestSolRecordProcessorIF)processor).configs.get("processor.config"));

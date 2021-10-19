@@ -58,14 +58,14 @@ public class SolaceSinkSender {
   private final AtomicInteger txMsgCounter = new AtomicInteger();
   private final SolaceSinkTask sinkTask;
   private final Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
-  
+
   /**
    * Class that sends Solace Messages from Kafka Records.
    * @param sconfig JCSMP Configuration
    * @param sessionHandler SolSessionHandler
    * @param useTxforQueue
    * @param sinkTask Connector Sink Task
-   * @throws JCSMPException 
+   * @throws JCSMPException
    */
   public SolaceSinkSender(final SolaceSinkConnectorConfig sconfig,
                           final SolSessionHandler sessionHandler,
@@ -77,7 +77,7 @@ public class SolaceSinkSender {
     this.sinkTask = sinkTask;
     this.kafkaKey = sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
     this.topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
-    this.processor = sconfig.getSolRecordProcessor();
+    this.processor = sconfig.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);
   }
 
   /**
@@ -92,7 +92,7 @@ public class SolaceSinkSender {
       counter++;
     }
   }
-  
+
   /**
    * Generate PubSub queue
    */
@@ -189,14 +189,14 @@ public class SolaceSinkSender {
         }
       }
     }
-    
+
     // Solace limits transaction size to 255 messages so need to force commit
     if ( useTxforQueue && txMsgCounter.get() > sconfig.getInt(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE)-1 ) {
       log.debug("================ Queue transaction autoflush size reached, flushing offsets from connector");
       sinkTask.flush(offsets);
     }
   }
-  
+
   /**
    * Commit Solace and Kafka records.
    * @return Boolean Status
@@ -208,11 +208,11 @@ public class SolaceSinkSender {
         sessionHandler.getTxSession().commit();
         commited = true;
         txMsgCounter.set(0);
-        log.debug("Comitted Solace records for transaction with status: {}", 
+        log.debug("Comitted Solace records for transaction with status: {}",
             sessionHandler.getTxSession().getStatus().name());
       }
     } catch (JCSMPException e) {
-      log.info("Received Solace TX exception {}, with the following: {} ", 
+      log.info("Received Solace TX exception {}, with the following: {} ",
           e.getCause(), e.getStackTrace());
       log.info("The TX error could be due to using dynamic destinations and "
           + "  \"sol.dynamic_destination=true\" was not set in the configuration ");
