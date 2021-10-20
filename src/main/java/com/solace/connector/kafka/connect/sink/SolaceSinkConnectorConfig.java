@@ -257,9 +257,19 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_KERBEROS_LOGIN_CONFIG, Type.STRING, "", Importance.LOW,
             "Location of the Kerberos Login Configuration File")
 
-
+        .define(
+                SolaceSinkConstants.SOL_EMIT_KAFKA_RECORD_HEADERS_ENABLED,
+                Type.BOOLEAN,
+                false,
+                Importance.LOW,
+                "Should Kafka headers be automatically copied to Solace messages as user properties."
+        )
         ;
 
+  }
+
+  public boolean isEmitKafkaRecordHeadersEnabled() {
+    return getBoolean(SolaceSinkConstants.SOL_EMIT_KAFKA_RECORD_HEADERS_ENABLED);
   }
 
   static ConfigDef config = solaceConfigDef();
