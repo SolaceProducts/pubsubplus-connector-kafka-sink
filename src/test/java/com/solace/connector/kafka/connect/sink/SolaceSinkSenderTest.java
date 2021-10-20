@@ -18,30 +18,33 @@
  */
 package com.solace.connector.kafka.connect.sink;
 
-import com.solacesystems.jcsmp.*;
+import com.solace.connector.kafka.connect.sink.recordprocessor.SolSimpleRecordProcessor;
+import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.JCSMPException;
+import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.JCSMPSession;
+import com.solacesystems.jcsmp.SDTMap;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.sink.SinkRecord;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+@ExtendWith(MockitoExtension.class)
 public class SolaceSinkSenderTest {
 
-    private SolSessionHandler mkSessionHandler;
-    private JCSMPSession mkJcsmpSession;
-    private SolaceSinkTask mkSolaceSinkTask;
-
-    @Before
-    public void setUp() {
-        mkSessionHandler = Mockito.mock(SolSessionHandler.class);
-        mkSolaceSinkTask = Mockito.mock(SolaceSinkTask.class);
-        mkJcsmpSession = Mockito.mock(JCSMPSession.class);
-    }
+    @Mock private SolSessionHandler mkSessionHandler;
+    @Mock private JCSMPSession mkJcsmpSession;
+    @Mock private SolaceSinkTask mkSolaceSinkTask;
 
     @Test
     public void shouldAddKafkaRecordHeadersOnBytesXMLMessageWhenEnabled() throws JCSMPException {
@@ -50,7 +53,8 @@ public class SolaceSinkSenderTest {
         Mockito.when(mkJcsmpSession.getMessageProducer(Mockito.any())).thenReturn(null);
 
         final SolaceSinkConnectorConfig connectorConfig = new SolaceSinkConnectorConfig(
-                Map.of(SolaceSinkConstants.SOL_EMIT_KAFKA_RECORD_HEADERS_ENABLED, "true")
+                Map.of(SolaceSinkConstants.SOL_EMIT_KAFKA_RECORD_HEADERS_ENABLED, "true",
+                        SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolSimpleRecordProcessor.class.getName())
         );
 
         final SolaceSinkSender sender = new SolaceSinkSender(
@@ -90,9 +94,9 @@ public class SolaceSinkSenderTest {
 
         // THEN
         SDTMap properties = msg.getProperties();
-        Assert.assertNotNull(properties);
-        Assert.assertEquals("val1", properties.getString("h1"));
-        Assert.assertEquals("val2", properties.getString("h2"));
-        Assert.assertEquals("val5", properties.getString("h3"));
+        assertNotNull(properties);
+        assertEquals("val1", properties.getString("h1"));
+        assertEquals("val2", properties.getString("h2"));
+        assertEquals("val5", properties.getString("h3"));
     }
 }

@@ -30,59 +30,56 @@ import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
-
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class SolaceSinkSender {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkSender.class);
 
-  private SolaceSinkConnectorConfig sconfig;
-  private XMLMessageProducer topicProducer;
+  private final SolaceSinkConnectorConfig sconfig;
+  private final XMLMessageProducer topicProducer;
   private XMLMessageProducer queueProducer;
-  private SolSessionHandler sessionHandler;
-  private BytesXMLMessage message;
-  private List<Topic> topics = new ArrayList<Topic>();
+  private final SolSessionHandler sessionHandler;
+  private final List<Topic> topics = new ArrayList<>();
   private Queue solQueue = null;
   private boolean useTxforQueue = false;
-  private Class<?> cprocessor;
-  private SolRecordProcessorIF processor;
-  private String kafkaKey;
-  private AtomicInteger txMsgCounter = new AtomicInteger();
-  private SolaceSinkTask sinkTask;
-  private Map<TopicPartition, OffsetAndMetadata> offsets
-      = new HashMap<TopicPartition, OffsetAndMetadata>();
-  
+  private final SolRecordProcessorIF processor;
+  private final String kafkaKey;
+  private final AtomicInteger txMsgCounter = new AtomicInteger();
+  private final SolaceSinkTask sinkTask;
+  private final Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
+
   /**
    * Class that sends Solace Messages from Kafka Records.
    * @param sconfig JCSMP Configuration
    * @param sessionHandler SolSessionHandler
    * @param useTxforQueue
    * @param sinkTask Connector Sink Task
-   * @throws JCSMPException 
+   * @throws JCSMPException
    */
-  public SolaceSinkSender(SolaceSinkConnectorConfig sconfig, SolSessionHandler sessionHandler, 
-      boolean useTxforQueue, SolaceSinkTask sinkTask) throws JCSMPException {
+  public SolaceSinkSender(final SolaceSinkConnectorConfig sconfig,
+                          final SolSessionHandler sessionHandler,
+                          final boolean useTxforQueue,
+                          final SolaceSinkTask sinkTask) throws JCSMPException {
     this.sconfig = sconfig;
     this.sessionHandler = sessionHandler;
     this.useTxforQueue = useTxforQueue;
     this.sinkTask = sinkTask;
-    kafkaKey = sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
-    topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
-    cprocessor = (this.sconfig.getClass(SolaceSinkConstants.SOL_RECORD_PROCESSOR));
-    try {
-      processor = (SolRecordProcessorIF) cprocessor.newInstance();
-    } catch (InstantiationException | IllegalAccessException e) {
-      log.info("================ Received exception while creating record processing class {}, "
-          + "with the following: {} ",
-          e.getCause(), e.getStackTrace());
-    }
+    this.kafkaKey = sconfig.getString(SolaceSinkConstants.SOL_KAFKA_MESSAGE_KEY);
+    this.topicProducer = sessionHandler.getSession().getMessageProducer(new SolStreamingMessageCallbackHandler());
+    this.processor = sconfig.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);
   }
 
   /**
@@ -97,7 +94,7 @@ public class SolaceSinkSender {
       counter++;
     }
   }
-  
+
   /**
    * Generate PubSub queue
    */
@@ -123,6 +120,7 @@ public class SolaceSinkSender {
    * @param record Kafka Records
    */
   public void sendRecord(SinkRecord record) {
+    BytesXMLMessage message;
     try {
       message = processor.processRecord(kafkaKey, record);
       offsets.put(new TopicPartition(record.topic(), record.kafkaPartition()),
@@ -131,11 +129,13 @@ public class SolaceSinkSender {
           + "Offset: {}", record.topic(),
           record.kafkaPartition(), record.kafkaOffset());
     } catch (Exception e) {
-      log.info(
-          "================ Encountered exception in record processing....discarded."
-          + " Cause: {}, Stacktrace: {} ",
-          e.getCause(), e.getStackTrace());
-      return;
+      if (sconfig.getBoolean(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR)) {
+        log.warn("================ Encountered exception in record processing for record of topic {}, partition {} " +
+                        "and offset {}....discarded", record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
+        return;
+      } else {
+        throw new ConnectException("Encountered exception in record processing", e);
+      }
     }
 
     if (message.getAttachmentContentLength() == 0 || message.getAttachmentByteBuffer() == null) {
@@ -152,17 +152,21 @@ public class SolaceSinkSender {
       try {
         dest = userMap.getDestination("dynamicDestination");
       } catch (SDTException e) {
-        log.info("================ Received exception retrieving Dynamic Destination:  "
-            + "{}, with the following: {} ",
-            e.getCause(), e.getStackTrace());
+        if (sconfig.getBoolean(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR)) {
+          log.warn("================ Received exception retrieving Dynamic Destination....discarded", e);
+          return;
+        } else {
+          throw new ConnectException("Received exception retrieving Dynamic Destination", e);
+        }
       }
       try {
         topicProducer.send(message, dest);
+      } catch (IllegalArgumentException e) {
+        throw new ConnectException(String.format("Received exception while sending message to topic %s",
+                dest != null ? dest.getName() : null), e);
       } catch (JCSMPException e) {
-        log.info(
-            "================ Received exception while sending message to topic {}:  "
-            + "{}, with the following: {} ",
-            dest.getName(), e.getCause(), e.getStackTrace());
+        throw new RetriableException(String.format("Received exception while sending message to topic %s",
+                dest != null ? dest.getName() : null), e);
       }
     } else {
       // Process when Dynamic destination is not set
@@ -174,10 +178,12 @@ public class SolaceSinkSender {
             txMsgCounter.getAndIncrement();
             log.trace("================ Count of TX message is now: {}", txMsgCounter.get());
           }
+        } catch (IllegalArgumentException e) {
+          throw new ConnectException(String.format("Received exception while sending message to queue %s",
+                  solQueue.getName()), e);
         } catch (JCSMPException e) {
-          log.info("================ Received exception while sending message to queue {}:  "
-              + "{}, with the following: {} ",
-              solQueue.getName(), e.getCause(), e.getStackTrace());
+          throw new RetriableException(String.format("Received exception while sending message to queue %s",
+                  solQueue.getName()), e);
         }
       }
       if (topics.size() != 0 && message.getDestination() == null) {
@@ -186,21 +192,30 @@ public class SolaceSinkSender {
         while (topics.size() > count) {
           try {
             topicProducer.send(message, topics.get(count));
+          } catch (IllegalArgumentException e) {
+            throw new ConnectException(String.format("Received exception while sending message to topic %s",
+                    topics.get(count).getName()), e);
           } catch (JCSMPException e) {
-            log.trace(
-                "================ Received exception while sending message to topic {}:  "
-                + "{}, with the following: {} ",
-                topics.get(count).getName(), e.getCause(), e.getStackTrace());
+            throw new RetriableException(String.format("Received exception while sending message to topic %s",
+                    topics.get(count).getName()), e);
           }
           count++;
         }
       }
     }
-    
+
     // Solace limits transaction size to 255 messages so need to force commit
     if ( useTxforQueue && txMsgCounter.get() > sconfig.getInt(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE)-1 ) {
       log.debug("================ Queue transaction autoflush size reached, flushing offsets from connector");
-      sinkTask.flush(offsets);
+      try {
+        sinkTask.flush(offsets);
+      } catch (ConnectException e) {
+        if (e.getCause() instanceof JCSMPException) {
+          throw new RetriableException(e.getMessage(), e.getCause());
+        } else {
+          throw e;
+        }
+      }
     }
   }
 
@@ -227,26 +242,14 @@ public class SolaceSinkSender {
 
   /**
    * Commit Solace and Kafka records.
-   * @return Boolean Status
    */
-  public synchronized boolean commit() {
-    boolean commited = true;
-    try {
-      if (useTxforQueue) {
-        sessionHandler.getTxSession().commit();
-        commited = true;
-        txMsgCounter.set(0);
-        log.debug("Comitted Solace records for transaction with status: {}", 
-            sessionHandler.getTxSession().getStatus().name());
-      }
-    } catch (JCSMPException e) {
-      log.info("Received Solace TX exception {}, with the following: {} ", 
-          e.getCause(), e.getStackTrace());
-      log.info("The TX error could be due to using dynamic destinations and "
-          + "  \"sol.dynamic_destination=true\" was not set in the configuration ");
-      commited = false;
+  public synchronized void commit() throws JCSMPException {
+    if (useTxforQueue) {
+      sessionHandler.getTxSession().commit();
+      txMsgCounter.set(0);
+      log.debug("Comitted Solace records for transaction with status: {}",
+          sessionHandler.getTxSession().getStatus().name());
     }
-    return commited;
   }
 
   /**

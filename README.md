@@ -1,4 +1,7 @@
 [![Actions Status](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/workflows/build/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions?query=workflow%3Abuild+branch%3Amaster)
+[![Code Analysis (CodeQL)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/codeql-analysis.yml/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/codeql-analysis.yml)
+[![Code Analysis (PMD)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/pmd-analysis.yml/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/pmd-analysis.yml)
+[![Code Analysis (SpotBugs)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/spotbugs-analysis.yml/badge.svg?branch=master)](https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/actions/workflows/spotbugs-analysis.yml)
 
 # Solace PubSub+ Connector for Kafka: Sink
 
@@ -267,9 +270,13 @@ Note that generally one connector can send to only one queue.
 
 ##### Recovery from Kafka Connect API or Kafka Broker Failure
 
+Operators are expected to monitor their connector for failures since errors will cause it to stop. If any are found and the connector was stopped, the operator must explicitly restart it again once the error condition has been resolved.
+
 The Kafka Connect API automatically keeps track of the offset that the Sink Connector has read and processed. If the connector stops or is restarted, the Connect API starts passing records to the connector based on the last saved offset.
 
 The time interval to save the last offset can be tuned via the `offset.flush.interval.ms` parameter (default 60,000 ms) in the worker's `connect-distributed.properties` configuration file.
+
+Multiple retries can also be configured using the `errors.retry.timeout` parameter (default 0 ms) in the PubSub+ Sink Connector `solace_sink.properties` configuration file. Please refer to the [Kafka documentation](https://kafka.apache.org/documentation/#connect_errorreporting) for more info on retry configuration options.
 
 Recovery may result in duplicate PubSub+ events published to the Event Mesh. As described [above](#record-processors), the Solace message header "User Property Map" contains all the Kafka unique record information which enables identifying and filtering duplicates.
 
@@ -318,27 +325,38 @@ Kerberos has some very specific requirements to operate correctly. Some addition
 
 ## Developers Guide
 
-### Build and Test the Project
+### Build the Project
 
 JDK 8 or higher is required for this project.
 
 First, clone this GitHub repo:
-```
+```shell
 git clone https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git
 cd pubsubplus-connector-kafka-sink
 ```
 
 Then run the build script:
-```
-gradlew clean build
+```shell
+./gradlew clean build
 ```
 
 This script creates artifacts in the `build` directory, including the deployable packaged PubSub+ Sink Connector archives under `build\distributions`.
 
+### Test the Project
+
 An integration test suite is also included, which spins up a Docker-based deployment environment that includes a PubSub+ event broker, Zookeeper, Kafka broker, Kafka Connect. It deploys the connector to Kafka Connect and runs end-to-end tests.
-```
-gradlew clean integrationTest --tests com.solace.connector.kafka.connect.sink.it.SinkConnectorIT
-```
+
+1. Install the test support module:
+    ```shell
+    git submodule update --init --recursive
+    cd solace-integration-test-support
+    ./mvnw clean install -DskipTests
+    cd ..
+    ```
+2. Run the tests:
+    ```shell
+    ./gradlew clean test integrationTest
+    ```
 
 ### Build a New Record Processor
 

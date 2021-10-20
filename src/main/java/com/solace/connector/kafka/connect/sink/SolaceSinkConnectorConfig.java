@@ -51,7 +51,7 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_USERNAME,
             Type.STRING, "default", Importance.HIGH, "Solace username")
         .define(SolaceSinkConstants.SOL_PASSWORD,
-            Type.STRING, "default", Importance.HIGH, "Solace user password")
+            Type.PASSWORD, "default", Importance.HIGH, "Solace user password")
         .define(SolaceSinkConstants.SOL_HOST, Type.STRING, null, Importance.HIGH,
             "host to connect with, can be comma delimited for HA/DR")
         .define(SolaceSinkConstants.SOL_VPN_NAME, Type.STRING, "default", Importance.HIGH,
@@ -63,6 +63,9 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR,
             Type.CLASS, SolRecordProcessorIF.class, Importance.HIGH,
             "default Solace message processor to use against Kafka Sink Records")
+        .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR,
+            Type.BOOLEAN, false, Importance.MEDIUM,
+            "If enabled, records that throw record processor errors will be discarded")
         .define(SolaceSinkConstants.SOL_LOCALHOST, Type.STRING, null, Importance.LOW,
             "The hostname or IP address of the machine on which the application "
             + "is running. On a multihomed machine, it is strongly recommended "
@@ -204,7 +207,7 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE,
             Type.STRING, "/lib/security/jssecacerts", Importance.LOW,
             "This property is used to specify the truststore file to use in URL or path format.")
-        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE_PASSWORD, Type.STRING, "", Importance.LOW,
+        .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE_PASSWORD, Type.PASSWORD, "", Importance.LOW,
             "This property is used to specify the password of the truststore "
             + "given in SSL_TRUST_STORE")
         .define(SolaceSinkConstants.SOL_SSL_TRUST_STORE_FORMAT,
@@ -217,7 +220,7 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
             + "common names for matching with server certificates.")
         .define(SolaceSinkConstants.SOL_SSL_KEY_STORE, Type.STRING, "", Importance.LOW,
             "This property is used to specify the keystore file to use in URL or path format.")
-        .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_PASSWORD, Type.STRING, "", Importance.LOW,
+        .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_PASSWORD, Type.PASSWORD, "", Importance.LOW,
             "This property is used to specify the password of the "
             + "keystore specified by SSL_KEY_STORE.")
         .define(SolaceSinkConstants.SOL_SSL_KEY_STORE_FORMAT, Type.STRING, "JKS", Importance.LOW,
@@ -231,7 +234,7 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
             "This property is used to specify the alias of the private key to use "
             + "for client certificate authentication.")
         .define(SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_PASSWORD,
-            Type.STRING, "", Importance.LOW,
+            Type.PASSWORD, "", Importance.LOW,
             "This property is used to specify the password that deciphers "
             + "the private key from the key store.")
         .define(SolaceSinkConstants.SOL_ACK_EVENT_MODE,

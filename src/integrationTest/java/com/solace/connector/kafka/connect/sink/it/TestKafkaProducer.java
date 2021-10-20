@@ -5,30 +5,28 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
-public class TestKafkaProducer  implements TestConstants {
+public class TestKafkaProducer  implements AutoCloseable {
 
     static Logger logger = LoggerFactory.getLogger(TestKafkaProducer.class.getName());
-    private String kafkaTopic;
+    private final String bootstrapHost;
+    private final String kafkaTopic;
     private KafkaProducer<byte[], byte[]> producer;
-    
-    public TestKafkaProducer(String kafkaTestTopic) {
-        kafkaTopic = kafkaTestTopic;
+
+    public TestKafkaProducer(String bootstrapHost, String kafkaTestTopic) {
+        this.bootstrapHost = bootstrapHost;
+        this.kafkaTopic = kafkaTestTopic;
     }
 
     public void start() {
-        String bootstrapServers = MessagingServiceFullLocalSetupConfluent.COMPOSE_CONTAINER_KAFKA.getServiceHost("kafka_1", 39092)
-                        + ":39092";
-        
         // create Producer properties
         Properties properties = new Properties();
-        properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapHost);
         properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
         properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
 
@@ -54,12 +52,12 @@ public class TestKafkaProducer  implements TestConstants {
             recordmetadata = producer.send(new ProducerRecord<>(kafkaTopic, msgKey.getBytes(), msgValue.getBytes())).get();
             logger.info("Message sent to Kafka topic " + kafkaTopic);
         } catch (InterruptedException | ExecutionException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            logger.error("Failed to send message to Kafka topic " + kafkaTopic, e);
         }
         return recordmetadata;
     }
-    
+
+    @Override
     public void close() {
         producer.close();
     }

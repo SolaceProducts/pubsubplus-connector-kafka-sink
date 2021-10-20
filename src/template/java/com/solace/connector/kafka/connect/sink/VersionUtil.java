@@ -6,8 +6,6 @@ public class VersionUtil {
    * @return Version Number
    */
   public static String getVersion() {
-
-    return "2.0.2";
-
+    return "${version}";
   }
 }

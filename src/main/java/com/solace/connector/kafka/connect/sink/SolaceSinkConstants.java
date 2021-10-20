@@ -30,6 +30,9 @@ public class SolaceSinkConstants {
   // High Importance Solace Message processor of Kafka Sink Records
   public static final String SOL_RECORD_PROCESSOR = "sol.record_processor_class";
 
+  // Medium Importance Solace Message processor of Kafka Sink Records
+  public static final String SOL_RECORD_PROCESSOR_IGNORE_ERROR = "sol.record_processor.error.ignore";
+
   // High Importance Solace
   public static final String SOL_HOST = "sol.host";
   public static final String SOL_USERNAME = "sol.username";
