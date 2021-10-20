@@ -22,7 +22,6 @@ import com.solacesystems.jcsmp.*;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.header.ConnectHeaders;
-import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.Assert;
 import org.junit.Before;
@@ -30,8 +29,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.util.Map;
-
-import static org.junit.Assert.*;
 
 public class SolaceSinkSenderTest {
 
@@ -53,7 +50,7 @@ public class SolaceSinkSenderTest {
         Mockito.when(mkJcsmpSession.getMessageProducer(Mockito.any())).thenReturn(null);
 
         final SolaceSinkConnectorConfig connectorConfig = new SolaceSinkConnectorConfig(
-                Map.of(SolaceSinkConstants.EMIT_KAFKA_RECORD_HEADERS_ENABLED, "true")
+                Map.of(SolaceSinkConstants.SOL_EMIT_KAFKA_RECORD_HEADERS_ENABLED, "true")
         );
 
         final SolaceSinkSender sender = new SolaceSinkSender(
@@ -67,6 +64,8 @@ public class SolaceSinkSenderTest {
 
         headers.addString("h2", "val2");
         headers.addString("h3", "val3");
+        headers.addString("h3", "val4");
+        headers.addString("h3", "val5");
 
         SinkRecord record = new SinkRecord(
                 "topic",
@@ -94,6 +93,6 @@ public class SolaceSinkSenderTest {
         Assert.assertNotNull(properties);
         Assert.assertEquals("val1", properties.getString("h1"));
         Assert.assertEquals("val2", properties.getString("h2"));
-        Assert.assertEquals("val3", properties.getString("h3"));
+        Assert.assertEquals("val5", properties.getString("h3"));
     }
 }
