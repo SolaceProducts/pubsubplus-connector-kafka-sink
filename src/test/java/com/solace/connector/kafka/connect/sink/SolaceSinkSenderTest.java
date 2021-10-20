@@ -34,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,10 +53,11 @@ public class SolaceSinkSenderTest {
         Mockito.when(mkSessionHandler.getSession()).thenReturn(mkJcsmpSession);
         Mockito.when(mkJcsmpSession.getMessageProducer(Mockito.any())).thenReturn(null);
 
-        final SolaceSinkConnectorConfig connectorConfig = new SolaceSinkConnectorConfig(
-                Map.of(SolaceSinkConstants.SOL_EMIT_KAFKA_RECORD_HEADERS_ENABLED, "true",
-                        SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolSimpleRecordProcessor.class.getName())
-        );
+        Map<String, String> config = new HashMap<>();
+        config.put(SolaceSinkConstants.SOL_EMIT_KAFKA_RECORD_HEADERS_ENABLED, "true");
+        config.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolSimpleRecordProcessor.class.getName());
+
+        final SolaceSinkConnectorConfig connectorConfig = new SolaceSinkConnectorConfig(config);
 
         final SolaceSinkSender sender = new SolaceSinkSender(
                 connectorConfig,
