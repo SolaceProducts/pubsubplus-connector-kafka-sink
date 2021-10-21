@@ -20,18 +20,19 @@
 package com.solace.connector.kafka.connect.sink;
 
 import com.solacesystems.jcsmp.JCSMPException;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
 import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 public class SolaceSinkTask extends SinkTask {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkTask.class);
@@ -49,16 +50,16 @@ public class SolaceSinkTask extends SinkTask {
 
   @Override
   public void start(Map<String, String> props) {
-    connectorConfig = new SolaceSinkConnectorConfig(props);  
+    connectorConfig = new SolaceSinkConnectorConfig(props);
     solSessionHandler = new SolSessionHandler(connectorConfig);
     try {
       solSessionHandler.configureSession();
       solSessionHandler.connectSession();
     } catch (JCSMPException e) {
-      failStart(e, "================ Failed to create JCSMPSession");
+      throw new ConnectException("Failed to create JCSMPSession", e);
     }
     log.info("================ JCSMPSession Connected");
-    
+
     if (connectorConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
       // Use transactions for queue destination
       useTxforQueue = connectorConfig.getBoolean(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE);
@@ -67,12 +68,12 @@ public class SolaceSinkTask extends SinkTask {
           solSessionHandler.createTxSession();
           log.info("================ Transacted Session has been Created for PubSub+ queue destination");
         } catch (JCSMPException e) {
-          failStart(e, "================ Failed to create Transacted Session for PubSub+ queue destination, "
-              + "make sure transacted sessions are enabled");
+          throw new ConnectException("Failed to create Transacted Session for PubSub+ queue destination, " +
+                  "make sure transacted sessions are enabled", e);
         }
       }
     }
-    
+
     try {
       solSender = new SolaceSinkSender(connectorConfig, solSessionHandler, useTxforQueue, this);
       if (connectorConfig.getString(SolaceSinkConstants.SOL_TOPICS) != null) {
@@ -81,22 +82,15 @@ public class SolaceSinkTask extends SinkTask {
       if (connectorConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
         solSender.setupDestinationQueue();
       }
-    } catch (JCSMPException e) {
-      failStart(e, "Failed to setup sender to PubSub+");
+    } catch (Exception e) {
+      throw new ConnectException("Failed to setup sender to PubSub+", e);
     }
-  }
-  
-  private void failStart(JCSMPException e, String logMessage) {
-    log.info("Received Solace exception {}, with the "
-        + "following: {} ", e.getCause(), e.getStackTrace());
-    log.info( "message");
-    stop();  // Connector cannot continue
   }
 
   @Override
   public void put(Collection<SinkRecord> records) {
     for (SinkRecord r : records) {
-      log.trace("Putting record to topic {}, partition {} and offset {}", r.topic(), 
+      log.trace("Putting record to topic {}, partition {} and offset {}", r.topic(),
           r.kafkaPartition(),
           r.kafkaOffset());
       solSender.sendRecord(r);
@@ -124,21 +118,23 @@ public class SolaceSinkTask extends SinkTask {
     for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : currentOffsets.entrySet()) {
       TopicPartition tp = entry.getKey();
       OffsetAndMetadata om = entry.getValue();
-      log.debug("Flushing up to topic {}, partition {} and offset {}", tp.topic(), 
+      log.debug("Flushing up to topic {}, partition {} and offset {}", tp.topic(),
           tp.partition(), om.offset());
     }
     if (useTxforQueue) {
-      boolean commited = solSender.commit();
-      if (!commited) {
-        log.info("Error in commiting transaction, shutting down");
-        stop();
+      try {
+        solSender.commit();
+      } catch (JCSMPException e) {
+        // Consider using RetriableException if the Kafka Connect API one day decides to support it for flush/commit
+        throw new ConnectException("Error in committing transaction. The TX error could be due to using dynamic " +
+                "destinations and \"sol.dynamic_destination=true\" was not set in the configuration.", e);
       }
     }
   }
 
   /**
    * Create reference for SinkTaskContext - required for replay.
-   * 
+   *
    * @param context SinkTaskContext
    */
   public void initialize(SinkTaskContext context) {
@@ -147,8 +143,8 @@ public class SolaceSinkTask extends SinkTask {
 
   /**
    * Opens access to partition write, this populates SinkTask Context
-   * which allows setting of offset from which to start reading. 
-   * 
+   * which allows setting of offset from which to start reading.
+   *
    * @param partitions List of TopicPartitions for Topic
    */
   public void open(Collection<TopicPartition> partitions) {
@@ -159,7 +155,7 @@ public class SolaceSinkTask extends SinkTask {
       Iterator<TopicPartition> partsIt = parts.iterator();
       while (partsIt.hasNext()) {
         TopicPartition tp = partsIt.next();
-        context.offset(tp, offsetLong);    
+        context.offset(tp, offsetLong);
       }
     }
   }
