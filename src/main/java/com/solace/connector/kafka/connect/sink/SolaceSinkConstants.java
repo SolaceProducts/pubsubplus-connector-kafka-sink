@@ -66,6 +66,7 @@ public class SolaceSinkConstants {
   public static final String SOL_KRB_SERVICE_NAME = "sol.krb_service_name";
   public static final String SOL_SSL_CONNECTION_DOWNGRADE_TO = "sol.ssl_connection_downgrade_to";
   public static final String SOl_USE_TRANSACTIONS_FOR_QUEUE = "sol.use_transactions_for_queue";
+  public static final String SOl_USE_TRANSACTIONS_FOR_TOPICS = "sol.use_transactions_for_topics";
 
   // Low Importance Solace TLS Protocol properties
   // public static final String SOL_SSL_PROTOCOL = "sol.ssl_protocol";
@@ -114,7 +115,7 @@ public class SolaceSinkConstants {
   // Low Importance Persistent Message Properties
   public static final String SOL_SUB_ACK_WINDOW_SIZE = "sol.sub_ack_window_size";
   public static final String SOL_PUB_ACK_WINDOW_SIZE = "sol.pub_ack_window_size";
-  public static final String SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE = "sol.autoflush.size";
+  public static final String SOL_AUTOFLUSH_SIZE = "sol.autoflush.size";
   public static final String SOL_SUB_ACK_TIME = "sol.sub_ack_time";
   public static final String SOL_PUB_ACK_TIME = "sol.pub_ack_time";
   public static final String SOL_SUB_ACK_WINDOW_THRESHOLD = "sol.sub_ack_window_threshold";

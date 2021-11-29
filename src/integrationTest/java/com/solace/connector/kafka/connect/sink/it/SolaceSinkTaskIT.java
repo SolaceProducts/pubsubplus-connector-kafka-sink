@@ -14,6 +14,7 @@ import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientProfile;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientUsername;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
+import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueueSubscription;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ClosedFacilityException;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -155,7 +156,6 @@ public class SolaceSinkTaskIT {
 				new ConfigMsgVpnClientProfile().allowTransactedSessionsEnabled(false), null);
 
 		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.start(connectorProperties));
-		assertThat(thrown.getMessage(), containsString("Failed to create Transacted Session"));
 		assertThat(thrown.getCause(), instanceOf(JCSMPException.class));
 		assertThat(thrown.getCause().getMessage(), containsString("Router does not support transacted sessions"));
 	}
@@ -285,9 +285,13 @@ public class SolaceSinkTaskIT {
 	@Test
 	public void testCommitRollback(SempV2Api sempV2Api, Queue queue) throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
+		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
 
 		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
+		sempV2Api.config().createMsgVpnQueueSubscription(vpnName, queue.getName(), new ConfigMsgVpnQueueSubscription()
+				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null);
 		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null);
 
 		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
@@ -312,15 +316,21 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
 		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
 		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
+		assertEquals(2, sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null)
+				.getData().getMaxMsgSizeExceededDiscardedMsgCount());
 	}
 
 	@Test
 	public void testAutoFlushCommitRollback(SempV2Api sempV2Api, Queue queue) throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
-		connectorProperties.put(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE, Integer.toString(1));
+		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
+		connectorProperties.put(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(2));
 
 		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
+		sempV2Api.config().createMsgVpnQueueSubscription(vpnName, queue.getName(), new ConfigMsgVpnQueueSubscription()
+				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null);
 		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null);
 
 		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
@@ -341,6 +351,8 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
 		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
 		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
+		assertEquals(2, sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null)
+				.getData().getMaxMsgSizeExceededDiscardedMsgCount());
 	}
 
 	public static class BadRecordProcessor implements SolRecordProcessorIF {

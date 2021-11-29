@@ -12,7 +12,9 @@ import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtens
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
+import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueueSubscription;
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.Destination;
 import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
@@ -21,6 +23,7 @@ import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -50,10 +53,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -137,8 +143,9 @@ public class SinkConnectorIT implements TestConstants {
         return metadata;
     }
 
-    void assertMessageReceived(String expectedSolaceQueue, String[] expectedSolaceTopics, RecordMetadata metadata,
-                               Map<AdditionalCheck, String> additionalChecks) throws SDTException, InterruptedException {
+    List<BytesXMLMessage> assertMessageReceived(String expectedSolaceQueue, String[] expectedSolaceTopics,
+                                                RecordMetadata metadata, Map<AdditionalCheck, String> additionalChecks)
+            throws SDTException, InterruptedException {
         List<BytesXMLMessage> receivedMessages = new ArrayList<>();
 
         // Wait for PubSub+ to report messages - populate queue and topics if provided
@@ -188,6 +195,8 @@ public class SinkConnectorIT implements TestConstants {
                 }
             }
         }
+
+        return receivedMessages;
     }
 
     ////////////////////////////////////////////////////
@@ -440,6 +449,12 @@ public class SinkConnectorIT implements TestConstants {
                                 @ExecSvc(poolSize = 2, scheduled = true) ScheduledExecutorService executorService)
                 throws Exception {
             Queue queue = JCSMPFactory.onlyInstance().createQueue(randomAlphanumeric(100));
+            connectorProps.setProperty(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+            connectorProps.setProperty(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
+            connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 2 : 100));
+            connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
+            connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
+            connectorProps.setProperty("errors.retry.timeout", Long.toString(-1));
 
             try (TestSolaceQueueConsumer solaceConsumer1 = new TestSolaceQueueConsumer(jcsmpSession)) {
                 EndpointProperties endpointProperties = new EndpointProperties();
@@ -447,15 +462,14 @@ public class SinkConnectorIT implements TestConstants {
                 solaceConsumer1.provisionQueue(queue.getName(), endpointProperties);
                 solaceConsumer1.start();
 
-                connectorProps.setProperty(SolaceSinkConstants.SOl_QUEUE, queue.getName());
-                connectorProps.setProperty(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 1 : 100));
-                connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
-                connectorProps.setProperty("errors.retry.timeout", Long.toString(-1));
+                sempV2Api.config().createMsgVpnQueueSubscription(SOL_VPN, queue.getName(), new ConfigMsgVpnQueueSubscription()
+                        .subscriptionTopic((String) connectorProps.get(SolaceSinkConstants.SOL_TOPICS)), null);
+
                 kafkaContext.getSolaceConnectorDeployment().startConnector(connectorProps);
 
                 clearReceivedMessages();
                 String recordValue = randomAlphanumeric(100);
-                Future<RecordMetadata> recordMetadata = executorService.schedule(() ->
+                Future<RecordMetadata> recordMetadataFuture = executorService.schedule(() ->
                         sendMessagetoKafka(kafkaContext.getProducer(), randomAlphanumeric(100), recordValue),
                         5, TimeUnit.SECONDS);
 
@@ -477,8 +491,19 @@ public class SinkConnectorIT implements TestConstants {
                                 .getAsJsonArray("tasks").get(0).getAsJsonObject().get("state").getAsString());
 
                 sempV2Api.config().updateMsgVpnQueue(SOL_VPN, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(10000000), null);
-                assertMessageReceived(queue.getName(), new String[0], recordMetadata.get(30, TimeUnit.SECONDS),
-                        ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, recordValue));
+                List<Destination> receivedMsgDestinations = new ArrayList<>();
+                for (int i = 0; i < 2; i++) {
+                    logger.info("Checking consumption of message {}", i);
+                    receivedMsgDestinations.addAll(assertMessageReceived(queue.getName(), new String[0],
+                            recordMetadataFuture.get(30, TimeUnit.SECONDS),
+                            ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, recordValue))
+                            .stream()
+                            .map(BytesXMLMessage::getDestination)
+                            .collect(Collectors.toList()));
+                }
+                assertThat(receivedMsgDestinations, hasSize(2));
+                assertThat(receivedMsgDestinations, hasItems(queue, JCSMPFactory.onlyInstance()
+                        .createTopic((String) connectorProps.get(SolaceSinkConstants.SOL_TOPICS))));
             } finally {
                 jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
             }
