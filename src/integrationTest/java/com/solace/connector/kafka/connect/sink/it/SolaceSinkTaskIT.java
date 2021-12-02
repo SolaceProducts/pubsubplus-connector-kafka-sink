@@ -1,6 +1,7 @@
 package com.solace.connector.kafka.connect.sink.it;
 
 import com.solace.connector.kafka.connect.sink.SolRecordProcessorIF;
+import com.solace.connector.kafka.connect.sink.SolSessionEventCallbackHandler;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
 import com.solace.connector.kafka.connect.sink.SolaceSinkSender;
 import com.solace.connector.kafka.connect.sink.SolaceSinkTask;
@@ -10,6 +11,8 @@ import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtens
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension;
 import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension.LogCaptor;
+import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension.JCSMPProxy;
+import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension.ToxiproxyContext;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientProfile;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnClientUsername;
@@ -17,11 +20,20 @@ import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueueSubscription;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ClosedFacilityException;
+import com.solacesystems.jcsmp.ConsumerFlowProperties;
+import com.solacesystems.jcsmp.Destination;
+import com.solacesystems.jcsmp.FlowReceiver;
 import com.solacesystems.jcsmp.JCSMPException;
+import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
+import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SDTException;
+import com.solacesystems.jcsmp.SessionEvent;
+import com.solacesystems.jcsmp.XMLMessage;
 import com.solacesystems.jcsmp.transaction.RollbackException;
+import eu.rekawek.toxiproxy.model.ToxicDirection;
+import eu.rekawek.toxiproxy.model.toxic.Latency;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -44,8 +56,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -55,6 +69,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -353,6 +368,91 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
 		assertEquals(2, sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null)
 				.getData().getMaxMsgSizeExceededDiscardedMsgCount());
+	}
+
+	@ParameterizedTest(name = "[{index}] autoFlush={0}")
+	@ValueSource(booleans = {false, true})
+	public void testLongCommit(boolean autoFlush,
+							   @JCSMPProxy JCSMPSession jcsmpSession,
+							   SempV2Api sempV2Api,
+							   Queue queue,
+							   @JCSMPProxy ToxiproxyContext jcsmpProxyContext,
+							   @ExecSvc ExecutorService executorService,
+							   @LogCaptor(SolSessionEventCallbackHandler.class) BufferedReader logReader)
+			throws Exception {
+		connectorProperties.put(SolaceSinkConstants.SOL_HOST, (String) jcsmpSession.getProperty(JCSMPProperties.HOST));
+		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
+		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
+		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
+		connectorProperties.put(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 2 : 100));
+		connectorProperties.put(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetries, Integer.toString(-1));
+
+		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
+		sempV2Api.config().createMsgVpnQueueSubscription(vpnName, queue.getName(), new ConfigMsgVpnQueueSubscription()
+				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null);
+
+		solaceSinkTask.start(connectorProperties);
+
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		Map<TopicPartition, OffsetAndMetadata> currentOffsets = Collections.singletonMap(
+				new TopicPartition(sinkRecord.topic(), sinkRecord.kafkaPartition()),
+				new OffsetAndMetadata(sinkRecord.kafkaOffset()));
+
+		logger.info("Cutting JCSMP upstream");
+		Latency lag = jcsmpProxyContext.getProxy().toxics()
+				.latency("lag", ToxicDirection.UPSTREAM, TimeUnit.HOURS.toMillis(1));
+
+		Future<?> future = executorService.submit(() -> {
+			String logLine;
+			do {
+				try {
+					logLine = logReader.readLine();
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			} while (!logLine.contains("Received Session Event " + SessionEvent.RECONNECTING));
+
+			try {
+				Thread.sleep(TimeUnit.SECONDS.toMillis(5));
+			} catch (InterruptedException ignored) {}
+
+			try {
+				logger.info("Restoring JCSMP upstream");
+				lag.remove();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		});
+
+		assertTimeoutPreemptively(Duration.ofMinutes(1), () -> {
+			solaceSinkTask.put(Collections.singleton(sinkRecord));
+			solaceSinkTask.flush(currentOffsets);
+		});
+		future.get(30, TimeUnit.SECONDS);
+
+		List<Destination> receivedDestinations = new ArrayList<>();
+		ConsumerFlowProperties consumerFlowProperties = new ConsumerFlowProperties();
+		consumerFlowProperties.setEndpoint(queue);
+		consumerFlowProperties.setStartState(true);
+		FlowReceiver flow = jcsmpSession.createFlow(null, consumerFlowProperties);
+		try {
+			assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+				while (receivedDestinations.size() < 2) {
+					logger.info("Receiving messages");
+					Optional.ofNullable(flow.receive())
+							.map(XMLMessage::getDestination)
+							.ifPresent(receivedDestinations::add);
+				}
+			});
+		} finally {
+			flow.close();
+		}
+
+		assertThat(receivedDestinations, hasItems(queue,
+				JCSMPFactory.onlyInstance().createTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS))));
 	}
 
 	public static class BadRecordProcessor implements SolRecordProcessorIF {

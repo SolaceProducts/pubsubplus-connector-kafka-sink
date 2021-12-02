@@ -1,6 +1,8 @@
 package com.solace.connector.kafka.connect.sink.it.util.testcontainers;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.solace.connector.kafka.connect.sink.SolProducerHandler;
+import com.solace.connector.kafka.connect.sink.SolaceSinkSender;
 import com.solace.connector.kafka.connect.sink.SolaceSinkTask;
 import com.solace.connector.kafka.connect.sink.it.Tools;
 import org.testcontainers.containers.BindMode;
@@ -23,6 +25,8 @@ public class BitnamiKafkaConnectContainer extends GenericContainer<BitnamiKafkaC
 	private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("bitnami/kafka");
 	private static final String DEFAULT_IMAGE_TAG = "2";
 	private static final String STARTER_SCRIPT = "/testcontainers_start.sh";
+	private static final String PROPS_CONNECT = "/opt/bitnami/kafka/config/connect-distributed.properties";
+	private static final String PROPS_LOG4J = "/opt/bitnami/kafka/config/connect-log4j.properties";
 	private DockerImageName zookeeperDockerImageName = DockerImageName.parse("bitnami/zookeeper:3");
 	private GenericContainer<?> zookeeperContainer;
 
@@ -77,14 +81,17 @@ public class BitnamiKafkaConnectContainer extends GenericContainer<BitnamiKafkaC
 	protected void containerIsStarting(InspectContainerResponse containerInfo) {
 		String command = "/bin/sh\n" +
 				"set -e\n" +
-				"echo 'plugin.path=/opt/bitnami/kafka/jars' >> /opt/bitnami/kafka/config/connect-distributed.properties\n" +
-				"echo 'rest.port=" + CONNECT_PORT + "' >> /opt/bitnami/kafka/config/connect-distributed.properties\n" +
-				"echo 'log4j.logger.org.apache.kafka.connect.runtime.WorkerSinkTask=DEBUG' >> /opt/bitnami/kafka/config/connect-log4j.properties\n" +
-				"echo 'log4j.logger." + SolaceSinkTask.class.getName() + "=TRACE' >> /opt/bitnami/kafka/config/connect-log4j.properties\n" +
+				"echo 'plugin.path=/opt/bitnami/kafka/jars' >> " 			+ PROPS_CONNECT + "\n" +
+				"echo 'rest.port=" + CONNECT_PORT + "' >> " 				+ PROPS_CONNECT + "\n" +
+				"echo 'connector.client.config.override.policy=All' >> " 	+ PROPS_CONNECT + "\n" +
+				"echo 'log4j.logger.org.apache.kafka.connect.runtime.WorkerSinkTask=TRACE' >> " + PROPS_LOG4J + "\n" +
+				"echo 'log4j.logger." + SolProducerHandler.class.getName() + "=TRACE' >> "		+ PROPS_LOG4J + "\n" +
+				"echo 'log4j.logger." + SolaceSinkSender.class.getName() + "=TRACE' >> "		+ PROPS_LOG4J + "\n" +
+				"echo 'log4j.logger." + SolaceSinkTask.class.getName() + "=TRACE' >> " 			+ PROPS_LOG4J + "\n" +
 				"export KAFKA_CFG_ADVERTISED_LISTENERS=" + advertisedListeners(containerInfo) + "\n" +
 				"/opt/bitnami/scripts/kafka/setup.sh\n" +
 				"/opt/bitnami/scripts/kafka/run.sh &\n" +
-				"/opt/bitnami/kafka/bin/connect-distributed.sh /opt/bitnami/kafka/config/connect-distributed.properties\n";
+				"/opt/bitnami/kafka/bin/connect-distributed.sh " + PROPS_CONNECT + "\n";
 		copyFileToContainer(Transferable.of(command.getBytes(StandardCharsets.UTF_8), 0777), STARTER_SCRIPT);
 		super.containerIsStarting(containerInfo);
 	}
