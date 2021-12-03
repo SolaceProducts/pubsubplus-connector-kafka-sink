@@ -422,12 +422,13 @@ public class SolaceSinkTaskIT {
 			try {
 				logger.info("Restoring JCSMP upstream");
 				lag.remove();
+				logger.info("JCSMP upstream restored");
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
 		});
 
-		assertTimeoutPreemptively(Duration.ofMinutes(1), () -> {
+		assertTimeoutPreemptively(Duration.ofMinutes(5), () -> {
 			solaceSinkTask.put(Collections.singleton(sinkRecord));
 			solaceSinkTask.flush(currentOffsets);
 		});
