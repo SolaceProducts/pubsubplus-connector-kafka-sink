@@ -6,9 +6,10 @@ import com.google.gson.JsonObject;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
 import com.solace.connector.kafka.connect.sink.it.util.ThrowingFunction;
 import com.solace.connector.kafka.connect.sink.it.util.extensions.KafkaArgumentsProvider;
-import com.solace.connector.kafka.connect.sink.it.util.extensions.KafkaArgumentsProvider.KafkaArgumentSource;
 import com.solace.connector.kafka.connect.sink.it.util.extensions.KafkaArgumentsProvider.KafkaContext;
+import com.solace.connector.kafka.connect.sink.it.util.extensions.KafkaArgumentsProvider.KafkaSource;
 import com.solace.connector.kafka.connect.sink.it.util.extensions.NetworkPubSubPlusExtension;
+import com.solace.connector.kafka.connect.sink.recordprocessor.SolDynamicDestinationRecordProcessor;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension.JCSMPProxy;
@@ -18,7 +19,6 @@ import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueueSubscription;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.Destination;
-import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -46,8 +46,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
-import org.junitpioneer.jupiter.CartesianProductTest;
-import org.junitpioneer.jupiter.CartesianValueSource;
+import org.junitpioneer.jupiter.cartesian.CartesianTest;
+import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.WaitingConsumer;
@@ -416,7 +416,7 @@ public class SinkConnectorIT implements TestConstants {
 
         @BeforeEach
         void setUp() {
-            connectorProps.setProperty("sol.record_processor_class", "com.solace.connector.kafka.connect.sink.recordprocessor.SolDynamicDestinationRecordProcessor");
+            connectorProps.setProperty("sol.record_processor_class", SolDynamicDestinationRecordProcessor.class.getName());
             connectorProps.setProperty("sol.dynamic_destination", "true");
             connectorProps.setProperty("sol.topics", String.join(", ", topics));
             connectorProps.setProperty("sol.queue", SOL_QUEUE);
@@ -424,9 +424,12 @@ public class SinkConnectorIT implements TestConstants {
 
 
         @DisplayName("TextMessage-DynamicDestinationMessageProcessor-start")
-        @ParameterizedTest
-        @ArgumentsSource(KafkaArgumentsProvider.class)
-        void kafkaConsumerTextMessageToTopicTest(KafkaContext kafkaContext) {
+        @CartesianTest(name = "[{index}] transacted={0}, autoFlush={1}, kafka={2}")
+        void kafkaConsumerTextMessageToTopicTest(@Values(booleans = { true, false }) boolean transacted,
+                                                 @Values(booleans = { true, false }) boolean autoFlush,
+                                                 @KafkaSource KafkaContext kafkaContext) {
+            connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(transacted));
+            connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 1 : 200));
             kafkaContext.getSolaceConnectorDeployment().startConnector(connectorProps);
             messageToKafkaTest(kafkaContext,
                             // expected list of delivery queue and topics
@@ -438,9 +441,12 @@ public class SinkConnectorIT implements TestConstants {
         }
 
         @DisplayName("TextMessage-DynamicDestinationMessageProcessor-stop")
-        @ParameterizedTest
-        @ArgumentsSource(KafkaArgumentsProvider.class)
-        void kafkaConsumerTextMessageToTopicTest2(KafkaContext kafkaContext) {
+        @CartesianTest(name = "[{index}] transacted={0}, autoFlush={1}, kafka={2}")
+        void kafkaConsumerTextMessageToTopicTest2(@Values(booleans = { true, false }) boolean transacted,
+                                                  @Values(booleans = { true, false }) boolean autoFlush,
+                                                  @KafkaSource KafkaContext kafkaContext) {
+            connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(transacted));
+            connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 1 : 200));
             kafkaContext.getSolaceConnectorDeployment().startConnector(connectorProps);
             messageToKafkaTest(kafkaContext,
                             // expected list of delivery queue and topics
@@ -452,9 +458,12 @@ public class SinkConnectorIT implements TestConstants {
         }
 
         @DisplayName("TextMessage-DynamicDestinationMessageProcessor-other")
-        @ParameterizedTest
-        @ArgumentsSource(KafkaArgumentsProvider.class)
-        void kafkaConsumerTextMessageToTopicTest3(KafkaContext kafkaContext) {
+        @CartesianTest(name = "[{index}] transacted={0}, autoFlush={1}, kafka={2}")
+        void kafkaConsumerTextMessageToTopicTest3(@Values(booleans = { true, false }) boolean transacted,
+                                                  @Values(booleans = { true, false }) boolean autoFlush,
+                                                  @KafkaSource KafkaContext kafkaContext) {
+            connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(transacted));
+            connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 1 : 200));
             kafkaContext.getSolaceConnectorDeployment().startConnector(connectorProps);
             messageToKafkaTest(kafkaContext,
                             // expected list of delivery queue and topics
@@ -489,20 +498,29 @@ public class SinkConnectorIT implements TestConstants {
             }, () -> "Timed out waiting for connector to fail: " + GSON.toJson(connectorStatus.get()));
         }
 
-        @CartesianProductTest(name = "[{index}] autoFlush={0}, kafka={1}")
-        @CartesianValueSource(booleans = { true, false })
-        @KafkaArgumentSource
-        void testRebalancedKafkaConsumers(boolean autoFlush,
-                                          KafkaContext kafkaContext,
+        @CartesianTest(name = "[{index}] dynamicDestination={0}, autoFlush={1}, kafka={2}")
+        void testRebalancedKafkaConsumers(@Values(booleans = { false, true }) boolean dynamicDestination,
+                                          @Values(booleans = { false, true }) boolean autoFlush,
+                                          @KafkaSource KafkaContext kafkaContext,
                                           @JCSMPProxy ToxiproxyContext jcsmpProxyContext,
                                           @ExecSvc(poolSize = 2, scheduled = true) ScheduledExecutorService executorService)
                 throws Exception {
+            String topicName;
+
+            if (dynamicDestination) {
+                topicName = "comms/bus/" + RandomStringUtils.randomAlphanumeric(4);
+                connectorProps.setProperty(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Boolean.toString(true));
+                connectorProps.setProperty(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolDynamicDestinationRecordProcessor.class.getName());
+                connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 1 : 100));
+            } else {
+                topicName = SOL_ROOT_TOPIC + "/" + RandomStringUtils.randomAlphanumeric(100);
+                connectorProps.setProperty(SolaceSinkConstants.SOl_QUEUE, SOL_QUEUE);
+                connectorProps.setProperty(SolaceSinkConstants.SOL_TOPICS, topicName);
+                connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 2 : 100));
+            }
+
             connectorProps.setProperty(SolaceSinkConstants.SOL_HOST, String.format("tcp://%s:%s",
                     jcsmpProxyContext.getDockerNetworkAlias(), jcsmpProxyContext.getProxy().getOriginalProxyPort()));
-            connectorProps.setProperty(SolaceSinkConstants.SOl_QUEUE, SOL_QUEUE);
-            connectorProps.setProperty(SolaceSinkConstants.SOL_TOPICS,
-                    SOL_ROOT_TOPIC + "/" + RandomStringUtils.randomAlphanumeric(100));
-            connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 2 : 100));
             connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
             connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
             connectorProps.setProperty(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetries, Integer.toString(-1));
@@ -517,7 +535,10 @@ public class SinkConnectorIT implements TestConstants {
             clearReceivedMessages();
             String recordValue = randomAlphanumeric(100);
             Future<RecordMetadata> recordMetadataFuture = executorService.schedule(() ->
-                            sendMessagetoKafka(kafkaContext.getProducer(), randomAlphanumeric(100), recordValue),
+                            sendMessagetoKafka(kafkaContext.getProducer(), randomAlphanumeric(100),
+                                    dynamicDestination ?
+                                            topicName.substring("comms/bus/".length()) + ":" + recordValue :
+                                            recordValue),
                     5, TimeUnit.SECONDS);
 
             logger.info("Waiting for Kafka poll interval to expire...");
@@ -537,50 +558,73 @@ public class SinkConnectorIT implements TestConstants {
             lag.remove();
 
             logger.info("Checking consumption of message");
-            assertMessageReceived(kafkaContext, SOL_QUEUE,
-                    new String[]{(String) connectorProps.get(SolaceSinkConstants.SOL_TOPICS)},
+            assertMessageReceived(kafkaContext, dynamicDestination ? null : SOL_QUEUE,
+                    new String[]{topicName},
                     recordMetadataFuture.get(30, TimeUnit.SECONDS),
                     ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, recordValue));
 
             logger.info("Sending a new message to verify that Solace producers & Kafka consumers have recovered");
             clearReceivedMessages();
             String newRecordValue = randomAlphanumeric(100);
-            messageToKafkaTest(kafkaContext, SOL_QUEUE,
-                    new String[]{(String) connectorProps.get(SolaceSinkConstants.SOL_TOPICS)},
-                    randomAlphanumeric(100), newRecordValue,
+            messageToKafkaTest(kafkaContext, dynamicDestination ? null : SOL_QUEUE,
+                    new String[]{topicName},
+                    randomAlphanumeric(100), dynamicDestination ?
+                            topicName.substring("comms/bus/".length()) + ":" + newRecordValue :
+                            newRecordValue,
                     ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, newRecordValue));
         }
 
-        @CartesianProductTest(name = "[{index}] autoFlush={0}, kafka={1}")
-        @CartesianValueSource(booleans = { true, false })
-        @KafkaArgumentSource
-        void testCommitRollback(boolean autoFlush, KafkaContext kafkaContext,
-                                JCSMPSession jcsmpSession, SempV2Api sempV2Api,
+        @CartesianTest(name = "[{index}] dynamicDestination={0}, autoFlush={1}, kafka={2}")
+        void testCommitRollback(@Values(booleans = { false, true }) boolean dynamicDestination,
+                                @Values(booleans = { false, true }) boolean autoFlush,
+                                @KafkaSource KafkaContext kafkaContext,
+                                JCSMPSession jcsmpSession,
+                                SempV2Api sempV2Api,
+                                Queue queue,
                                 @ExecSvc(poolSize = 2, scheduled = true) ScheduledExecutorService executorService)
                 throws Exception {
-            Queue queue = JCSMPFactory.onlyInstance().createQueue(randomAlphanumeric(100));
-            connectorProps.setProperty(SolaceSinkConstants.SOl_QUEUE, queue.getName());
-            connectorProps.setProperty(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
-            connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 2 : 100));
+            String topicName;
+            if (dynamicDestination) {
+                topicName = "comms/bus/" + RandomStringUtils.randomAlphanumeric(4);
+                connectorProps.setProperty(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Boolean.toString(true));
+                connectorProps.setProperty(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolDynamicDestinationRecordProcessor.class.getName());
+                connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 1 : 200));
+            } else {
+                topicName = RandomStringUtils.randomAlphanumeric(100);
+                connectorProps.setProperty(SolaceSinkConstants.SOl_QUEUE, queue.getName());
+                connectorProps.setProperty(SolaceSinkConstants.SOL_TOPICS, topicName);
+                connectorProps.setProperty(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(autoFlush ? 2 : 200));
+            }
+
             connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
             connectorProps.setProperty(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
             connectorProps.setProperty("errors.retry.timeout", Long.toString(-1));
 
-            try (TestSolaceQueueConsumer solaceConsumer1 = new TestSolaceQueueConsumer(jcsmpSession)) {
-                EndpointProperties endpointProperties = new EndpointProperties();
-                endpointProperties.setMaxMsgSize(1);
-                solaceConsumer1.provisionQueue(queue.getName(), endpointProperties);
-                solaceConsumer1.start();
+            sempV2Api.config().updateMsgVpnQueue(SOL_VPN, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1),
+                    null);
+            sempV2Api.config().createMsgVpnQueueSubscription(SOL_VPN, queue.getName(),
+                    new ConfigMsgVpnQueueSubscription().subscriptionTopic(topicName), null);
+            assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+                while (sempV2Api.monitor().getMsgVpnQueue(SOL_VPN, queue.getName(), null).getData()
+                        .getMaxMsgSize() != 1) {
+                    logger.info("Waiting for queue {} to have max message size of 1", queue.getName());
+                    Thread.sleep(100);
+                }
+            });
 
-                sempV2Api.config().createMsgVpnQueueSubscription(SOL_VPN, queue.getName(), new ConfigMsgVpnQueueSubscription()
-                        .subscriptionTopic((String) connectorProps.get(SolaceSinkConstants.SOL_TOPICS)), null);
+            try (TestSolaceQueueConsumer solaceConsumer1 = new TestSolaceQueueConsumer(jcsmpSession)) {
+                solaceConsumer1.setQueueName(queue.getName());
+                solaceConsumer1.start();
 
                 kafkaContext.getSolaceConnectorDeployment().startConnector(connectorProps);
 
                 clearReceivedMessages();
                 String recordValue = randomAlphanumeric(100);
                 Future<RecordMetadata> recordMetadataFuture = executorService.schedule(() ->
-                        sendMessagetoKafka(kafkaContext.getProducer(), randomAlphanumeric(100), recordValue),
+                        sendMessagetoKafka(kafkaContext.getProducer(), randomAlphanumeric(100),
+                                dynamicDestination ?
+                                        topicName.substring("comms/bus/".length()) + ":" + recordValue :
+                                        recordValue),
                         5, TimeUnit.SECONDS);
 
                 WaitingConsumer logConsumer = new WaitingConsumer();
@@ -614,7 +658,7 @@ public class SinkConnectorIT implements TestConstants {
                 sendMessagetoKafka(kafkaContext.getProducer(), randomAlphanumeric(100), randomAlphanumeric(100));
 
                 List<Destination> receivedMsgDestinations = new ArrayList<>();
-                while (receivedMsgDestinations.size() < 2) {
+                while (receivedMsgDestinations.size() < (dynamicDestination ? 1 : 2)) {
                     logger.info("Checking consumption of messages");
                     receivedMsgDestinations.addAll(assertMessageReceived(kafkaContext, queue.getName(), new String[0],
                             recordMetadataFuture.get(30, TimeUnit.SECONDS),
@@ -623,11 +667,15 @@ public class SinkConnectorIT implements TestConstants {
                             .map(BytesXMLMessage::getDestination)
                             .collect(Collectors.toList()));
                 }
-                assertThat(receivedMsgDestinations, hasSize(2));
-                assertThat(receivedMsgDestinations, hasItems(queue, JCSMPFactory.onlyInstance()
-                        .createTopic((String) connectorProps.get(SolaceSinkConstants.SOL_TOPICS))));
-            } finally {
-                jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+
+                if (dynamicDestination) {
+                    assertThat(receivedMsgDestinations, hasSize(1));
+                    assertThat(receivedMsgDestinations, hasItems(JCSMPFactory.onlyInstance().createTopic(topicName)));
+                } else {
+                    assertThat(receivedMsgDestinations, hasSize(2));
+                    assertThat(receivedMsgDestinations, hasItems(queue,
+                            JCSMPFactory.onlyInstance().createTopic(topicName)));
+                }
             }
         }
     }

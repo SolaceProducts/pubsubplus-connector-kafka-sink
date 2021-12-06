@@ -57,6 +57,7 @@ public class ConfluentKafkaConnectContainer extends GenericContainer<ConfluentKa
 		withEnv("CONNECT_LOG4J_ROOT_LOGLEVEL", "INFO");
 		withEnv("CONNECT_LOG4J_LOGGERS", String.join(",",
 				String.join("=", "org.apache.kafka.connect.runtime.WorkerSinkTask", "TRACE"),
+				String.join("=", "com.solace.connector.kafka.connect.sink", "DEBUG"),
 				String.join("=", SolProducerHandler.class.getName(), "TRACE"),
 				String.join("=", SolaceSinkSender.class.getName(), "TRACE"),
 				String.join("=", SolaceSinkTask.class.getName(), "TRACE")

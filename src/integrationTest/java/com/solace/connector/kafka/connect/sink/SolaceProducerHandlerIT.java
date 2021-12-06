@@ -19,8 +19,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junitpioneer.jupiter.CartesianProductTest;
-import org.junitpioneer.jupiter.CartesianValueSource;
+import org.junitpioneer.jupiter.cartesian.CartesianTest;
+import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,13 +67,13 @@ public class SolaceProducerHandlerIT {
 		}
 	}
 
-	@CartesianProductTest(name = "[{index}] txnQueue={0}, txnTopic={1}, sendToQueue={2}, sendToTopic={3}")
-	@CartesianValueSource(booleans = {true, false})
-	@CartesianValueSource(booleans = {true, false})
-	@CartesianValueSource(booleans = {true, false})
-	@CartesianValueSource(booleans = {true, false})
-	public void testStaticDestinations(boolean txnQueue, boolean txnTopic, boolean sendToQueue, boolean sendToTopic,
-									   JCSMPSession session, Queue queue) throws Exception {
+	@CartesianTest(name = "[{index}] txnQueue={0}, txnTopic={1}, sendToQueue={2}, sendToTopic={3}")
+	public void testStaticDestinations(@Values(booleans = {true, false}) boolean txnQueue,
+									   @Values(booleans = {true, false}) boolean txnTopic,
+									   @Values(booleans = {true, false}) boolean sendToQueue,
+									   @Values(booleans = {true, false}) boolean sendToTopic,
+									   JCSMPSession session,
+									   Queue queue) throws Exception {
 		properties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
 		properties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
 		properties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(txnQueue));
@@ -114,13 +114,13 @@ public class SolaceProducerHandlerIT {
 		}
 	}
 
-	@CartesianProductTest(name = "[{index}] txnQueue={0}, txnTopic={1}, sendToQueue={2}, sendToTopic={3}")
-	@CartesianValueSource(booleans = {true, false})
-	@CartesianValueSource(booleans = {true, false})
-	@CartesianValueSource(booleans = {true, false})
-	@CartesianValueSource(booleans = {true, false})
-	public void testLazyInit(boolean txnQueue, boolean txnTopic, boolean sendToQueue, boolean sendToTopic,
-							 JCSMPSession session, Queue queue) throws Exception {
+	@CartesianTest(name = "[{index}] txnQueue={0}, txnTopic={1}, sendToQueue={2}, sendToTopic={3}")
+	public void testLazyInit(@Values(booleans = {true, false}) boolean txnQueue,
+							 @Values(booleans = {true, false}) boolean txnTopic,
+							 @Values(booleans = {true, false}) boolean sendToQueue,
+							 @Values(booleans = {true, false}) boolean sendToTopic,
+							 JCSMPSession session,
+							 Queue queue) throws Exception {
 		properties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(txnQueue));
 		properties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(txnTopic));
 

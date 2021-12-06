@@ -85,6 +85,7 @@ public class BitnamiKafkaConnectContainer extends GenericContainer<BitnamiKafkaC
 				"echo 'rest.port=" + CONNECT_PORT + "' >> " 				+ PROPS_CONNECT + "\n" +
 				"echo 'connector.client.config.override.policy=All' >> " 	+ PROPS_CONNECT + "\n" +
 				"echo 'log4j.logger.org.apache.kafka.connect.runtime.WorkerSinkTask=TRACE' >> " + PROPS_LOG4J + "\n" +
+				"echo 'log4j.logger.com.solace.connector.kafka.connect.sink=DEBUG' >> "			+ PROPS_LOG4J + "\n" +
 				"echo 'log4j.logger." + SolProducerHandler.class.getName() + "=TRACE' >> "		+ PROPS_LOG4J + "\n" +
 				"echo 'log4j.logger." + SolaceSinkSender.class.getName() + "=TRACE' >> "		+ PROPS_LOG4J + "\n" +
 				"echo 'log4j.logger." + SolaceSinkTask.class.getName() + "=TRACE' >> " 			+ PROPS_LOG4J + "\n" +

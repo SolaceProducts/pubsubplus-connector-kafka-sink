@@ -6,6 +6,9 @@
 		</Console>
 	</Appenders>
 	<Loggers>
+		<Logger name="com.solace.connector.kafka.connect.sink" level="trace" additivity="false">
+			<AppenderRef ref="Console"/>
+		</Logger>
 		<Root level="INFO">
 			<AppenderRef ref="Console"/>
 		</Root>

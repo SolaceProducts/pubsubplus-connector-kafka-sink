@@ -33,7 +33,7 @@ testSets {
 
 dependencies {
     integrationTestImplementation 'org.junit.jupiter:junit-jupiter:5.8.1'
-    integrationTestImplementation 'org.junit-pioneer:junit-pioneer:1.4.2'
+    integrationTestImplementation 'org.junit-pioneer:junit-pioneer:1.5.0'
     integrationTestImplementation 'org.mockito:mockito-junit-jupiter:3.12.4'
     integrationTestImplementation 'org.testcontainers:testcontainers:1.16.0'
     integrationTestImplementation 'org.testcontainers:junit-jupiter:1.16.0'
