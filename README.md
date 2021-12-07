@@ -258,17 +258,25 @@ A value of 0 results in the replay of the entire Kafka Topic. A positive value r
 
 We recommend using PubSub+ Topics if high throughput is required and the Kafka Topic is configured for high performance. Message duplication and loss mimics the underlying reliability and QoS configured for the Kafka topic.
 
+By default, messages are published to topics using direct messaging. To publish persistent messages to topics using a local transaction, set `sol.use_transactions_for_topics` to `true`. See [Sending with Local Transactions](#sending-with-local-transactions) for more info.
+
 #### Sending to PubSub+ Queue
 
 When Kafka records reliability is critical, we recommend configuring the Sink Connector to send records to the Event Mesh using PubSub+ queues at the cost of reduced throughput.
 
 A PubSub+ queue guarantees order of delivery, provides High Availability and Disaster Recovery (depending on the setup of the PubSub+ brokers) and provides an acknowledgment to the connector when the event is stored in all HA and DR members and flushed to disk. This is a higher guarantee than is provided by Kafka, even for Kafka idempotent delivery.
 
-The connector uses local transactions to deliver to the queue by default. The transaction is committed if messages are flushed by Kafka Connect (see below how to tune flush interval) or the outstanding messages size reaches the `sol.autoflush.size` (default 200) configuration.
+The connector uses local transactions to deliver to the queue by default. See [Sending with Local Transactions](#sending-with-local-transactions) for more info.
 
 Note that generally one connector can send to only one queue.
 
-##### Recovery from Kafka Connect API or Kafka Broker Failure
+#### Sending with Local Transactions
+
+By default, only sending to a queue uses local transactions. To use the transacted session to send persistent messages to topics, set `sol.use_transactions_for_topics` to `true`.
+
+The transaction is committed if messages are flushed by Kafka Connect (see [below how to tune flush interval](#recovery-from-kafka-connect-api-or-kafka-broker-failure)) or the outstanding messages size reaches the `sol.autoflush.size` (default 200) configuration.
+
+#### Recovery from Kafka Connect API or Kafka Broker Failure
 
 Operators are expected to monitor their connector for failures since errors will cause it to stop. If any are found and the connector was stopped, the operator must explicitly restart it again once the error condition has been resolved.
 

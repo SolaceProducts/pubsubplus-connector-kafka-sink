@@ -1,5 +1,8 @@
 package com.solace.connector.kafka.connect.sink.it.util.testcontainers;
 
+import com.solace.connector.kafka.connect.sink.SolProducerHandler;
+import com.solace.connector.kafka.connect.sink.SolaceSinkSender;
+import com.solace.connector.kafka.connect.sink.SolaceSinkTask;
 import com.solace.connector.kafka.connect.sink.it.Tools;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
@@ -50,7 +53,15 @@ public class ConfluentKafkaConnectContainer extends GenericContainer<ConfluentKa
 		withEnv("CONNECT_INTERNAL_KEY_CONVERTER", "org.apache.kafka.connect.json.JsonConverter");
 		withEnv("CONNECT_INTERNAL_VALUE_CONVERTER", "org.apache.kafka.connect.json.JsonConverter");
 		withEnv("CONNECT_REST_ADVERTISED_HOST_NAME", "localhost");
+		withEnv("CONNECT_CONNECTOR_CLIENT_CONFIG_OVERRIDE_POLICY", "All");
 		withEnv("CONNECT_LOG4J_ROOT_LOGLEVEL", "INFO");
+		withEnv("CONNECT_LOG4J_LOGGERS", String.join(",",
+				String.join("=", "org.apache.kafka.connect.runtime.WorkerSinkTask", "TRACE"),
+				String.join("=", "com.solace.connector.kafka.connect.sink", "DEBUG"),
+				String.join("=", SolProducerHandler.class.getName(), "TRACE"),
+				String.join("=", SolaceSinkSender.class.getName(), "TRACE"),
+				String.join("=", SolaceSinkTask.class.getName(), "TRACE")
+		));
 		withEnv("CONNECT_PLUGIN_PATH", "/usr/share/java,/etc/kafka-connect/jars");
 		withClasspathResourceMapping(Tools.getUnzippedConnectorDirName() + "/lib",
 				"/etc/kafka-connect/jars", BindMode.READ_ONLY);

@@ -38,7 +38,6 @@ public class SolaceSinkTask extends SinkTask {
   private static final Logger log = LoggerFactory.getLogger(SolaceSinkTask.class);
   private SolSessionHandler solSessionHandler;
   private SolaceSinkSender solSender;
-  private boolean useTxforQueue = false;
   private SinkTaskContext context;
 
   SolaceSinkConnectorConfig connectorConfig;
@@ -60,28 +59,8 @@ public class SolaceSinkTask extends SinkTask {
     }
     log.info("================ JCSMPSession Connected");
 
-    if (connectorConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
-      // Use transactions for queue destination
-      useTxforQueue = connectorConfig.getBoolean(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE);
-      if (useTxforQueue) {
-        try {
-          solSessionHandler.createTxSession();
-          log.info("================ Transacted Session has been Created for PubSub+ queue destination");
-        } catch (JCSMPException e) {
-          throw new ConnectException("Failed to create Transacted Session for PubSub+ queue destination, " +
-                  "make sure transacted sessions are enabled", e);
-        }
-      }
-    }
-
     try {
-      solSender = new SolaceSinkSender(connectorConfig, solSessionHandler, useTxforQueue, this);
-      if (connectorConfig.getString(SolaceSinkConstants.SOL_TOPICS) != null) {
-        solSender.setupDestinationTopics();
-      }
-      if (connectorConfig.getString(SolaceSinkConstants.SOl_QUEUE) != null) {
-        solSender.setupDestinationQueue();
-      }
+      solSender = new SolaceSinkSender(connectorConfig, solSessionHandler, this);
     } catch (Exception e) {
       throw new ConnectException("Failed to setup sender to PubSub+", e);
     }
@@ -121,7 +100,7 @@ public class SolaceSinkTask extends SinkTask {
       log.debug("Flushing up to topic {}, partition {} and offset {}", tp.topic(),
           tp.partition(), om.offset());
     }
-    if (useTxforQueue) {
+    if (solSessionHandler.getTxSession() != null) {
       try {
         solSender.commit();
       } catch (JCSMPException e) {

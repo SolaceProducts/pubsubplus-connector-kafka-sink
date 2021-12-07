@@ -16,7 +16,7 @@ import org.junit.jupiter.api.extension.ExtensionContext.Store.CloseableResource;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
-import org.junitpioneer.jupiter.CartesianAnnotationConsumer;
+import org.junitpioneer.jupiter.cartesian.CartesianArgumentsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -28,16 +28,29 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Parameter;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
-public class KafkaArgumentsProvider implements ArgumentsProvider, CartesianAnnotationConsumer<KafkaArgumentsProvider.KafkaArgumentSource> {
+public class KafkaArgumentsProvider implements ArgumentsProvider,
+		CartesianArgumentsProvider<KafkaArgumentsProvider.KafkaContext> {
 	private static final Logger LOG = LoggerFactory.getLogger(KafkaArgumentsProvider.class);
 
 	@Override
 	public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
+		return createKafkaContexts(context).map(Arguments::of);
+	}
+
+	@Override
+	public Stream<KafkaContext> provideArguments(ExtensionContext context, Parameter parameter) {
+		Objects.requireNonNull(parameter.getAnnotation(KafkaSource.class));
+		return createKafkaContexts(context);
+	}
+
+	private Stream<KafkaContext> createKafkaContexts(ExtensionContext context) {
 		KafkaConnection bitnamiCxn = context.getRoot()
 				.getStore(KafkaNamespace.BITNAMI.getNamespace())
 				.getOrComputeIfAbsent(BitnamiResource.class, c -> {
@@ -86,8 +99,8 @@ public class KafkaArgumentsProvider implements ArgumentsProvider, CartesianAnnot
 				.getKafkaConnection();
 
 		return Stream.of(
-			Arguments.of(createKafkaContext(bitnamiCxn, KafkaNamespace.BITNAMI, context)),
-			Arguments.of(createKafkaContext(confluentCxn, KafkaNamespace.CONFLUENT, context))
+			createKafkaContext(bitnamiCxn, KafkaNamespace.BITNAMI, context),
+			createKafkaContext(confluentCxn, KafkaNamespace.CONFLUENT, context)
 		);
 	}
 
@@ -125,17 +138,10 @@ public class KafkaArgumentsProvider implements ArgumentsProvider, CartesianAnnot
 		return new KafkaContext(namespace, connection, adminClient, connectorDeployment, producer);
 	}
 
-	@Override
-	public void accept(KafkaArgumentSource kafkaArgumentSource) {
-
-	}
-
-	@Target(ElementType.METHOD)
+	@Target(ElementType.PARAMETER)
 	@Retention(RetentionPolicy.RUNTIME)
 	@ArgumentsSource(KafkaArgumentsProvider.class)
-	public @interface KafkaArgumentSource {
-
-	}
+	public @interface KafkaSource {}
 
 	public static class AutoDeleteSolaceConnectorDeploymentAfterEach implements AfterEachCallback {
 
