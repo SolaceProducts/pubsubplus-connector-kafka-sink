@@ -1,11 +1,15 @@
 import com.github.spotbugs.snom.SpotBugsTask
+import io.github.gradlenexus.publishplugin.InitializeNexusStagingRepository
 
 plugins {
     id 'java'
     id 'distribution'
     id 'jacoco'
+    id 'maven-publish'
     id 'pmd'
+    id 'signing'
     id 'com.github.spotbugs' version '4.7.6'
+    id 'io.github.gradle-nexus.publish-plugin' version '1.1.0'
     id 'org.gradle.test-retry' version '1.3.1'
     id 'org.unbroken-dome.test-sets' version '2.2.1'
 }
@@ -13,6 +17,7 @@ plugins {
 ext {
     kafkaVersion = '2.8.1'
     solaceJavaAPIVersion = '10.12.1'
+    isSnapshot = project.version.endsWith('-SNAPSHOT')
 }
 
 repositories {
@@ -186,6 +191,11 @@ project.compileJava {
     dependsOn generateJava
 }
 
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
 distributions {
     main {
         contents {
@@ -201,4 +211,77 @@ distributions {
             // from jar
         }
     }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = "Solace PubSub+ Connector for Kafka: Sink"
+                description = "The Solace/Kafka adapter consumes Kafka topic records and streams them to the PubSub+ Event Mesh as topic and/or queue data events."
+                url = "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink"
+                packaging = "jar"
+                licenses {
+                    license {
+                        name = "Apache License, Version 2.0"
+                        url = "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/blob/master/LICENSE"
+                        distribution = "repo"
+                    }
+                }
+                organization {
+                    name = "Solace"
+                    url = "https://www.solace.com"
+                }
+                developers {
+                    developer {
+                        name = "Support for Solace"
+                        email = "support@solace.com"
+                        organization = "Solace"
+                        organizationUrl = "http://solace.community"
+                    }
+                }
+                scm {
+                    connection = "scm:git:git://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git"
+                    developerConnection = "scm:git:git@github.com:SolaceProducts/pubsubplus-connector-kafka-sink.git"
+                    url = "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git"
+                }
+            }
+        }
+    }
+}
+
+nexusPublishing {
+    repositories {
+        internal {
+            nexusUrl = uri('http://apps-jenkins:9090/nexus/')
+            snapshotRepositoryUrl = uri('http://apps-jenkins:9090/nexus/content/repositories/snapshots')
+            // gets credentials from project.properties["internalUsername"] project.properties["internalPassword"]
+        }
+        sonatype {
+            nexusUrl = uri('https://oss.sonatype.org/service/local/')
+            snapshotRepositoryUrl = uri('https://oss.sonatype.org/content/repositories/snapshots')
+            // gets credentials from project.properties["sonatypeUsername"] project.properties["sonatypePassword"]
+        }
+    }
+}
+
+signing {
+    required {
+        !isSnapshot
+    }
+    useGpgCmd()
+    sign publishing.publications.maven
+}
+
+tasks.withType(Sign) {
+    onlyIf {
+        gradle.taskGraph.allTasks.any {task ->
+            task.name.startsWith("publish") && task.name.contains('Sonatype')
+        }
+    }
+}
+
+tasks.withType(InitializeNexusStagingRepository).configureEach {
+    shouldRunAfter(tasks.withType(Sign))
 }
