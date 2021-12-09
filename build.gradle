@@ -103,6 +103,7 @@ project.integrationTest {
     useJUnitPlatform()
     outputs.upToDateWhen { false }
     dependsOn prepDistForIntegrationTesting
+    shouldRunAfter test
     retry {
         maxRetries = 3
     }
@@ -280,8 +281,10 @@ tasks.withType(Sign) {
             task.name.startsWith("publish") && task.name.contains('Sonatype')
         }
     }
+    shouldRunAfter test, integrationTest
 }
 
 tasks.withType(InitializeNexusStagingRepository).configureEach {
-    shouldRunAfter(tasks.withType(Sign))
+    dependsOn test, integrationTest
+    shouldRunAfter tasks.withType(Sign)
 }
