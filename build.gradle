@@ -250,15 +250,22 @@ publishing {
             }
         }
     }
+    repositories {
+        maven {
+            def releasesUrl = uri('http://apps-jenkins:9090/nexus/content/repositories/releases')
+            def snapshotRepositoryUrl = uri('http://apps-jenkins:9090/nexus/content/repositories/snapshots')
+            url = isSnapshot ? snapshotRepositoryUrl : releasesUrl
+            name = 'internal'
+            credentials {
+                username = project.properties[name + "Username"]
+                password = project.properties[name + "Password"]
+            }
+        }
+    }
 }
 
 nexusPublishing {
     repositories {
-        internal {
-            nexusUrl = uri('http://apps-jenkins:9090/nexus/')
-            snapshotRepositoryUrl = uri('http://apps-jenkins:9090/nexus/content/repositories/snapshots')
-            // gets credentials from project.properties["internalUsername"] project.properties["internalPassword"]
-        }
         sonatype {
             nexusUrl = uri('https://oss.sonatype.org/service/local/')
             snapshotRepositoryUrl = uri('https://oss.sonatype.org/content/repositories/snapshots')
@@ -287,4 +294,8 @@ tasks.withType(Sign) {
 tasks.withType(InitializeNexusStagingRepository).configureEach {
     dependsOn test, integrationTest
     shouldRunAfter tasks.withType(Sign)
+}
+
+tasks.withType(PublishToMavenRepository).configureEach {
+    dependsOn test, integrationTest
 }
