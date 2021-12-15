@@ -337,16 +337,22 @@ Kerberos has some very specific requirements to operate correctly. Some addition
 
 JDK 8 or higher is required for this project.
 
-First, clone this GitHub repo:
-```shell
-git clone https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git
-cd pubsubplus-connector-kafka-sink
-```
-
-Then run the build script:
-```shell
-./gradlew clean build
-```
+1. First, clone this GitHub repo:
+   ```shell
+   git clone https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git
+   cd pubsubplus-connector-kafka-sink
+   ```
+2. Install the test support module:
+    ```shell
+    git submodule update --init --recursive
+    cd solace-integration-test-support
+    ./mvnw clean install -DskipTests
+    cd ..
+    ```
+3. Then run the build script:
+   ```shell
+   ./gradlew clean build
+   ```
 
 This script creates artifacts in the `build` directory, including the deployable packaged PubSub+ Sink Connector archives under `build\distributions`.
 
@@ -354,27 +360,40 @@ This script creates artifacts in the `build` directory, including the deployable
 
 An integration test suite is also included, which spins up a Docker-based deployment environment that includes a PubSub+ event broker, Zookeeper, Kafka broker, Kafka Connect. It deploys the connector to Kafka Connect and runs end-to-end tests.
 
-1. Install the test support module:
-    ```shell
-    git submodule update --init --recursive
-    cd solace-integration-test-support
-    ./mvnw clean install -DskipTests
-    cd ..
-    ```
-2. Run the tests:
+1. Run the tests:
     ```shell
     ./gradlew clean test integrationTest
     ```
 
 ### Build a New Record Processor
 
-The processing of a Kafka record to create a PubSub+ message is handled by an interface defined in [`SolRecordProcessorIF.java`](/src/main/java/com/solace/connector/kafka/connect/sink/SolRecordProcessorIF.java). This is a simple interface that creates the Kafka source records from the PubSub+ messages. This project includes three examples of classes that implement this interface:
+The processing of a Kafka record to create a PubSub+ message is handled by [`SolRecordProcessorIF`](/src/main/java/com/solace/connector/kafka/connect/sink/SolRecordProcessorIF.java). This is a simple interface that creates the Kafka source records from the PubSub+ messages.
+
+To get started, import the following dependency into your project:
+
+**Maven**
+```xml
+<dependency>
+   <groupId>com.solace.connector.kafka.connect</groupId>
+   <artifactId>pubsubplus-connector-kafka-sink</artifactId>
+   <version>2.2.0</version>
+</dependency>
+```
+
+**Gradle**
+```groovy
+compile "com.solace.connector.kafka.connect:pubsubplus-connector-kafka-sink:2.2.0"
+```
+
+Now you can implement your custom `SolRecordProcessorIF`.
+
+For reference, this project includes three examples which you can use as starting points for implementing your own custom record processors:
 
 * [SolSimpleRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolSimpleRecordProcessor.java)
 * [SolSimpleKeyedRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolSimpleKeyedRecordProcessor.java)
 * [SolDynamicDestinationRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolDynamicDestinationRecordProcessor.java)
 
-You can use these examples as starting points for implementing your own custom record processors.
+Once you've built the jar file for your custom record processor project, place it into the same directory as this connector, and update the connector's `sol.record_processor_class` config to point to the class of your new record processor.
 
 More information on Kafka sink connector development can be found here:
 - [Apache Kafka Connect](https://kafka.apache.org/documentation/)

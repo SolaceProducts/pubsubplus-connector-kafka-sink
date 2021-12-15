@@ -208,7 +208,6 @@ public class SolaceSinkSender {
 
   /**
    * Shutdown TXProducer and Topic Producer.
-   * @return
    */
   public void shutdown() {
     producerHandler.close();

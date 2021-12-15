@@ -167,7 +167,6 @@ public class SolSessionHandler {
 
   /**
    * Create and connect JCSMPSession
-   * @return
    * @throws JCSMPException
    */
   public void connectSession() throws JCSMPException {
