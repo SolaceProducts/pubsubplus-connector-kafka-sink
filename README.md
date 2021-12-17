@@ -258,17 +258,25 @@ A value of 0 results in the replay of the entire Kafka Topic. A positive value r
 
 We recommend using PubSub+ Topics if high throughput is required and the Kafka Topic is configured for high performance. Message duplication and loss mimics the underlying reliability and QoS configured for the Kafka topic.
 
+By default, messages are published to topics using direct messaging. To publish persistent messages to topics using a local transaction, set `sol.use_transactions_for_topics` to `true`. See [Sending with Local Transactions](#sending-with-local-transactions) for more info.
+
 #### Sending to PubSub+ Queue
 
 When Kafka records reliability is critical, we recommend configuring the Sink Connector to send records to the Event Mesh using PubSub+ queues at the cost of reduced throughput.
 
 A PubSub+ queue guarantees order of delivery, provides High Availability and Disaster Recovery (depending on the setup of the PubSub+ brokers) and provides an acknowledgment to the connector when the event is stored in all HA and DR members and flushed to disk. This is a higher guarantee than is provided by Kafka, even for Kafka idempotent delivery.
 
-The connector uses local transactions to deliver to the queue by default. The transaction is committed if messages are flushed by Kafka Connect (see below how to tune flush interval) or the outstanding messages size reaches the `sol.autoflush.size` (default 200) configuration.
+The connector uses local transactions to deliver to the queue by default. See [Sending with Local Transactions](#sending-with-local-transactions) for more info.
 
 Note that generally one connector can send to only one queue.
 
-##### Recovery from Kafka Connect API or Kafka Broker Failure
+#### Sending with Local Transactions
+
+By default, only sending to a queue uses local transactions. To use the transacted session to send persistent messages to topics, set `sol.use_transactions_for_topics` to `true`.
+
+The transaction is committed if messages are flushed by Kafka Connect (see [below how to tune flush interval](#recovery-from-kafka-connect-api-or-kafka-broker-failure)) or the outstanding messages size reaches the `sol.autoflush.size` (default 200) configuration.
+
+#### Recovery from Kafka Connect API or Kafka Broker Failure
 
 Operators are expected to monitor their connector for failures since errors will cause it to stop. If any are found and the connector was stopped, the operator must explicitly restart it again once the error condition has been resolved.
 
@@ -329,16 +337,22 @@ Kerberos has some very specific requirements to operate correctly. Some addition
 
 JDK 8 or higher is required for this project.
 
-First, clone this GitHub repo:
-```shell
-git clone https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git
-cd pubsubplus-connector-kafka-sink
-```
-
-Then run the build script:
-```shell
-./gradlew clean build
-```
+1. First, clone this GitHub repo:
+   ```shell
+   git clone https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink.git
+   cd pubsubplus-connector-kafka-sink
+   ```
+2. Install the test support module:
+    ```shell
+    git submodule update --init --recursive
+    cd solace-integration-test-support
+    ./mvnw clean install -DskipTests
+    cd ..
+    ```
+3. Then run the build script:
+   ```shell
+   ./gradlew clean build
+   ```
 
 This script creates artifacts in the `build` directory, including the deployable packaged PubSub+ Sink Connector archives under `build\distributions`.
 
@@ -346,27 +360,40 @@ This script creates artifacts in the `build` directory, including the deployable
 
 An integration test suite is also included, which spins up a Docker-based deployment environment that includes a PubSub+ event broker, Zookeeper, Kafka broker, Kafka Connect. It deploys the connector to Kafka Connect and runs end-to-end tests.
 
-1. Install the test support module:
-    ```shell
-    git submodule update --init --recursive
-    cd solace-integration-test-support
-    ./mvnw clean install -DskipTests
-    cd ..
-    ```
-2. Run the tests:
+1. Run the tests:
     ```shell
     ./gradlew clean test integrationTest
     ```
 
 ### Build a New Record Processor
 
-The processing of a Kafka record to create a PubSub+ message is handled by an interface defined in [`SolRecordProcessorIF.java`](/src/main/java/com/solace/connector/kafka/connect/sink/SolRecordProcessorIF.java). This is a simple interface that creates the Kafka source records from the PubSub+ messages. This project includes three examples of classes that implement this interface:
+The processing of a Kafka record to create a PubSub+ message is handled by [`SolRecordProcessorIF`](/src/main/java/com/solace/connector/kafka/connect/sink/SolRecordProcessorIF.java). This is a simple interface that creates the Kafka source records from the PubSub+ messages.
+
+To get started, import the following dependency into your project:
+
+**Maven**
+```xml
+<dependency>
+   <groupId>com.solace.connector.kafka.connect</groupId>
+   <artifactId>pubsubplus-connector-kafka-sink</artifactId>
+   <version>2.2.0</version>
+</dependency>
+```
+
+**Gradle**
+```groovy
+compile "com.solace.connector.kafka.connect:pubsubplus-connector-kafka-sink:2.2.0"
+```
+
+Now you can implement your custom `SolRecordProcessorIF`.
+
+For reference, this project includes three examples which you can use as starting points for implementing your own custom record processors:
 
 * [SolSimpleRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolSimpleRecordProcessor.java)
 * [SolSimpleKeyedRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolSimpleKeyedRecordProcessor.java)
 * [SolDynamicDestinationRecordProcessor](/src/main/java/com/solace/connector/kafka/connect/sink/recordprocessor/SolDynamicDestinationRecordProcessor.java)
 
-You can use these examples as starting points for implementing your own custom record processors.
+Once you've built the jar file for your custom record processor project, place it into the same directory as this connector, and update the connector's `sol.record_processor_class` config to point to the class of your new record processor.
 
 More information on Kafka sink connector development can be found here:
 - [Apache Kafka Connect](https://kafka.apache.org/documentation/)

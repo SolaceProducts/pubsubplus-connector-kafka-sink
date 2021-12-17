@@ -8,9 +8,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.IntStream;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.emptyArray;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -42,11 +47,30 @@ public class SolaceSinkConnectorConfigTest {
 		SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(configProps);
 
 		// THEN
-		SolRecordProcessorIF processor = config.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);;
+		SolRecordProcessorIF processor = config.getConfiguredInstance(SolaceSinkConstants.SOL_RECORD_PROCESSOR, SolRecordProcessorIF.class);
 		assertNotNull(processor);
 		assertNotNull(((TestSolRecordProcessorIF)processor).configs);
 		assertEquals("dummy", ((TestSolRecordProcessorIF)processor).configs.get("processor.config"));
 
+	}
+
+	@Test
+	public void testSplitTopics() {
+		String[] topics = IntStream.range(0, 10)
+				.mapToObj(i -> RandomStringUtils.randomAlphanumeric(30))
+				.toArray(String[]::new);
+		SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(
+				Collections.singletonMap(SolaceSinkConstants.SOL_TOPICS, String.join(",", topics)));
+		assertNotNull(config.getTopics());
+		assertArrayEquals(topics, config.getTopics());
+	}
+
+	@Test
+	public void testNullTopics() {
+		SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(
+				Collections.singletonMap(SolaceSinkConstants.SOL_TOPICS, null));
+		assertNotNull(config.getTopics());
+		assertThat(config.getTopics(), emptyArray());
 	}
 
 	public static class TestSolRecordProcessorIF implements SolRecordProcessorIF {

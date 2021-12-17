@@ -30,6 +30,8 @@ import com.solacesystems.jcsmp.transaction.TransactedSession;
 
 import java.util.Enumeration;
 import java.util.Optional;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.kafka.common.config.types.Password;
 import org.slf4j.Logger;
@@ -39,12 +41,13 @@ import org.slf4j.LoggerFactory;
 public class SolSessionHandler {
   private static final Logger log = LoggerFactory.getLogger(SolSessionHandler.class);
 
-  private SolaceSinkConnectorConfig lconfig;
+  private final SolaceSinkConnectorConfig lconfig;
 
   final JCSMPProperties properties = new JCSMPProperties();
   final JCSMPChannelProperties chanProperties = new JCSMPChannelProperties();
   private JCSMPSession session = null;
-  private TransactedSession txSession = null;
+  private volatile TransactedSession txSession = null;
+  private final Lock lock = new ReentrantLock();
 
   public SolSessionHandler(SolaceSinkConnectorConfig lconfig) {
     this.lconfig = lconfig;
@@ -164,7 +167,6 @@ public class SolSessionHandler {
 
   /**
    * Create and connect JCSMPSession
-   * @return
    * @throws JCSMPException
    */
   public void connectSession() throws JCSMPException {
@@ -180,11 +182,20 @@ public class SolSessionHandler {
 
   /**
    * Create transacted session
-   * @return TransactedSession
    * @throws JCSMPException
    */
   public void createTxSession() throws JCSMPException {
-      txSession = session.createTransactedSession();
+    if (txSession == null) {
+      lock.lock();
+      try {
+        if (txSession == null) {
+          txSession = session.createTransactedSession();
+          log.info("Transacted Session has been created");
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
    }
 
   public JCSMPSession getSession() {

@@ -7,7 +7,7 @@
 /bin/
 
 # Jave related
-target/**
+/target/
 *.jar
 *.war
 *.ear
@@ -46,3 +46,6 @@ local.properties
 
 # Unzipped test connector
 src/integrationTest/resources/pubsubplus-connector-kafka*/
+
+# Local testing
+solace.properties

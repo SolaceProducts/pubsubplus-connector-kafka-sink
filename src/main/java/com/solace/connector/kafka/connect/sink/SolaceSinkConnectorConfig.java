@@ -20,6 +20,7 @@
 package com.solace.connector.kafka.connect.sink;
 
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
@@ -118,7 +119,7 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_SUB_ACK_WINDOW_SIZE,
             Type.INT, 255, Importance.LOW,
             "The size of the sliding subscriber ACK window. The valid range is 1-255")
-        .define(SolaceSinkConstants.SOL_QUEUE_MESSAGES_AUTOFLUSH_SIZE,
+        .define(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE,
             Type.INT, 200, Importance.LOW,
             "Number of outstanding transacted messages before autoflush. Must be lower than "
             + "max PubSub+ transaction size (255). The valid range is 1-200")
@@ -137,6 +138,9 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE,
             Type.BOOLEAN, true, Importance.LOW,
             "Specifies if writing messages to queue destination shall use transactions.")
+        .define(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS,
+            Type.BOOLEAN, false, Importance.LOW,
+            "When true, messages published to topics will use persistent delivery type using transactions.")
         .define(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_connectTimeoutInMillis,
             Type.INT, 30000, Importance.MEDIUM,
             "Timeout value (in ms) for creating an initial connection to Solace")
@@ -266,6 +270,12 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         )
         ;
 
+  }
+
+  public String[] getTopics() {
+    return Optional.ofNullable(getString(SolaceSinkConstants.SOL_TOPICS))
+            .map(s -> s.split(","))
+            .orElse(new String[0]);
   }
 
   public boolean isEmitKafkaRecordHeadersEnabled() {
