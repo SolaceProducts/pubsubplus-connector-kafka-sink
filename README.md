@@ -60,7 +60,7 @@ PubSub+ brokers support bi-directional messaging and the unique addressing of mi
 
 The PubSub+ Kafka Sink Connector is available as a ZIP or TAR package from the [downloads](//solaceproducts.github.io/pubsubplus-connector-kafka-sink/downloads/) page.
 
-The package includes the jar libraries, documentation with license information, and sample property files. Download and extract it into a directory that is on the `plugin.path` of your `connect-standalone` or `connect-distributed` properties file.
+The package includes the jar libraries, documentation with license information, and sample property files. Download and extract it into a directory that is on the `plugin.path` of your `connect-standalone` or `connect-distributed` properties file.  In this tutorial, we assume that is just inside the kafka download.
 
 ## Quick Start
 
@@ -74,7 +74,7 @@ It builds on the open source [Apache Kafka Quickstart tutorial](//kafka.apache.o
 
 1. Install Kafka. Follow the [Apache tutorial](//kafka.apache.org/quickstart#quickstart_download) to download the Kafka release code, start the Zookeeper and Kafka servers in separate command line sessions, then create a topic named `test` and verify it exists.
 
-2. Install PubSub+ Sink Connector. Designate and create a directory for the PubSub+ Sink Connector (here, we assume it is named `connectors`). Edit the `config/connect-standalone.properties` file, and ensure the `plugin.path` parameter value includes the absolute path of the `connectors` directory.
+2. Install PubSub+ Sink Connector. Designate and create a directory for the PubSub+ Sink Connector (here, we assume it is named `connectors`). Edit the `config/connect-standalone.properties` file in the kafka config directory, and ensure the `plugin.path` parameter value includes the absolute path of the `connectors` directory.
 [Download]( https://solaceproducts.github.io/pubsubplus-connector-kafka-sink/downloads ) and extract the PubSub+ Sink Connector into the `connectors` directory.
 
 3. Acquire access to a PubSub+ message broker. If you don't already have one available, the easiest option is to get a free-tier service in a few minutes in [PubSub+ Cloud](//solace.com/try-it-now/), following the instructions in [Creating Your First Messaging Service](https://docs.solace.com/Solace-Cloud/ggs_signup.htm). 
@@ -95,7 +95,7 @@ It builds on the open source [Apache Kafka Quickstart tutorial](//kafka.apache.o
 
    **Note**: In the configured source and destination information, `topics` is the Kafka source topic (`test`), created in Step 1 and the `sol.topics` parameter specifies the destination topic on PubSub+ (`sinktest`).
 
-5. Start the connector in standalone mode. In a command line session run:
+5. Start the connector in standalone mode. In a command line session, in the kafka directory, run:
    ```sh
    bin/connect-standalone.sh \
    config/connect-standalone.properties \
@@ -105,6 +105,10 @@ It builds on the open source [Apache Kafka Quickstart tutorial](//kafka.apache.o
    ```
    ================Session is Connected
    ```
+   or
+   ```
+   ================ JCSMPSession Connected
+   ```
 
 6. To watch messages arriving into PubSub+, we use the "Try Me!" test service of the browser-based administration console to subscribe to messages to the `sinktest` topic. Behind the scenes, "Try Me!" uses the JavaScript WebSocket API.
 
@@ -113,11 +117,11 @@ It builds on the open source [Apache Kafka Quickstart tutorial](//kafka.apache.o
 
    In both cases ensure to set the topic to `sinktest`, which the connector is publishing to.
 
-7. Demo time! Start to write messages to the Kafka `test` topic. Get back to the Kafka [tutorial](//kafka.apache.org/quickstart#quickstart_send), type and send `Hello world!`.
+7. Demo time! Start to write messages to the Kafka `test` topic. From the kafka directory, type and send `Hello world!` using the kafka console producer [tutorial](//kafka.apache.org/quickstart#quickstart_send).
 
    The "Try Me!" consumer from Step 6 should now display the new message arriving to PubSub+ through the PubSub+ Kafka Sink Connector:
    ```
-   Hello world!
+      Hello world!
    ```
 
 ## Parameters
