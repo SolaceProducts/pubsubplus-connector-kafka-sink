@@ -16,7 +16,7 @@ plugins {
 
 ext {
     kafkaVersion = '2.8.1'
-    solaceJavaAPIVersion = '10.12.1'
+    solaceJavaAPIVersion = '10.15.0'
     isSnapshot = project.version.endsWith('-SNAPSHOT')
 }
 
@@ -54,6 +54,7 @@ dependencies {
     integrationTestImplementation 'commons-io:commons-io:2.11.0'
     integrationTestImplementation 'com.squareup.okhttp3:okhttp:4.10.0'
     integrationTestImplementation "org.apache.kafka:kafka-clients:$kafkaVersion"
+    testImplementation 'org.apache.commons:commons-lang3:3.12.0'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:4.7.0'
     testImplementation 'org.hamcrest:hamcrest-all:1.3'
