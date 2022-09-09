@@ -173,7 +173,7 @@ The connector's JSON configuration file, in this case, is called `solace_sink_pr
 
 Determine whether the Sink Connector is running with the following command:
 ```ini
-curl 18.218.82.209:8083/connectors/solaceSourceConnector/status | jq
+curl 18.218.82.209:8083/connectors/solaceSinkConnector/status | jq
 ```
 If there was an error in starting, the details are returned with this command. 
 
