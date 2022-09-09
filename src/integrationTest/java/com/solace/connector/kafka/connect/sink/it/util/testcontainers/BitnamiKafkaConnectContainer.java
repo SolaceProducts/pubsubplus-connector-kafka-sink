@@ -99,7 +99,6 @@ public class BitnamiKafkaConnectContainer extends GenericContainer<BitnamiKafkaC
 
 	@Override
 	public void close() {
-		super.close();
 		if (zookeeperContainer != null) {
 			zookeeperContainer.close();
 		}

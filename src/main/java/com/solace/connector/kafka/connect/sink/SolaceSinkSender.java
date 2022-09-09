@@ -30,7 +30,6 @@ import com.solacesystems.jcsmp.Topic;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +58,7 @@ public class SolaceSinkSender {
    * @param sconfig JCSMP Configuration
    * @param sessionHandler SolSessionHandler
    * @param sinkTask Connector Sink Task
-   * @throws JCSMPException
+   * @throws JCSMPException In case of JCSMP error
    */
   public SolaceSinkSender(final SolaceSinkConnectorConfig sconfig,
                           final SolSessionHandler sessionHandler,
@@ -125,11 +124,8 @@ public class SolaceSinkSender {
       }
       try {
         producerHandler.send(message, dest);
-      } catch (IllegalArgumentException e) {
+      } catch (IllegalArgumentException | JCSMPException e) {
         throw new ConnectException(String.format("Received exception while sending message to topic %s",
-                dest != null ? dest.getName() : null), e);
-      } catch (JCSMPException e) {
-        throw new RetriableException(String.format("Received exception while sending message to topic %s",
                 dest != null ? dest.getName() : null), e);
       }
     } else {
@@ -137,11 +133,8 @@ public class SolaceSinkSender {
       if (solQueue != null) {
         try {
           producerHandler.send(message, solQueue);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | JCSMPException e) {
           throw new ConnectException(String.format("Received exception while sending message to queue %s",
-                  solQueue.getName()), e);
-        } catch (JCSMPException e) {
-          throw new RetriableException(String.format("Received exception while sending message to queue %s",
                   solQueue.getName()), e);
         }
       }
@@ -149,11 +142,8 @@ public class SolaceSinkSender {
         for (Topic topic : topics) {
           try {
             producerHandler.send(message, topic);
-          } catch (IllegalArgumentException e) {
+          } catch (IllegalArgumentException | JCSMPException e) {
             throw new ConnectException(String.format("Received exception while sending message to topic %s",
-                    topic.getName()), e);
-          } catch (JCSMPException e) {
-            throw new RetriableException(String.format("Received exception while sending message to topic %s",
                     topic.getName()), e);
           }
         }
@@ -167,7 +157,7 @@ public class SolaceSinkSender {
       sinkTask.flush(offsets);
     } catch (ConnectException e) {
       if (e.getCause() instanceof JCSMPException) {
-        throw new RetriableException(e.getMessage(), e.getCause());
+        throw new ConnectException(e.getMessage(), e.getCause());
       } else {
         throw e;
       }
@@ -197,6 +187,7 @@ public class SolaceSinkSender {
 
   /**
    * Commit Solace and Kafka records.
+   * @throws JCSMPException In case of JCSMP error
    */
   public synchronized void commit() throws JCSMPException {
     if (producerHandler.getTxMsgCount().getAndSet(0) > 0) {
