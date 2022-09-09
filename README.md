@@ -103,7 +103,7 @@ It builds on the open source [Apache Kafka Quickstart tutorial](//kafka.apache.o
    ```
    After startup, the logs will eventually contain following line:
    ```
-   ================Session is Connected
+   ================ JCSMPSession Connected
    ```
 
 6. To watch messages arriving into PubSub+, we use the "Try Me!" test service of the browser-based administration console to subscribe to messages to the `sinktest` topic. Behind the scenes, "Try Me!" uses the JavaScript WebSocket API.
