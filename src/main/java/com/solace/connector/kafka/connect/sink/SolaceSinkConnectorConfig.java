@@ -58,12 +58,12 @@ public class SolaceSinkConnectorConfig extends AbstractConfig {
         .define(SolaceSinkConstants.SOL_VPN_NAME, Type.STRING, "default", Importance.HIGH,
             "Solace VPN to connect with ")
         .define(SolaceSinkConstants.SOL_TOPICS, Type.STRING, null, Importance.MEDIUM,
-            "Solace topic or list of topics to subscribe from")
+            "Solace topic or list of topics to publish to")
         .define(SolaceSinkConstants.SOl_QUEUE,
-            Type.STRING, null, Importance.MEDIUM, "Solace queue to consume from")
+            Type.STRING, null, Importance.MEDIUM, "Solace queue to publish to")
         .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR,
             Type.CLASS, SolRecordProcessorIF.class, Importance.HIGH,
-            "default Solace message processor to use against Kafka Sink Records")
+            "default Solace record processor to use against Kafka Sink Records")
         .define(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR,
             Type.BOOLEAN, false, Importance.MEDIUM,
             "If enabled, records that throw record processor errors will be discarded")

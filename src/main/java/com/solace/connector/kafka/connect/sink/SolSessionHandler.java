@@ -167,7 +167,7 @@ public class SolSessionHandler {
 
   /**
    * Create and connect JCSMPSession
-   * @throws JCSMPException
+   * @throws JCSMPException In case of JCSMP error
    */
   public void connectSession() throws JCSMPException {
       System.setProperty("java.security.auth.login.config",
@@ -182,7 +182,7 @@ public class SolSessionHandler {
 
   /**
    * Create transacted session
-   * @throws JCSMPException
+   * @throws JCSMPException In case of JCSMP error
    */
   public void createTxSession() throws JCSMPException {
     if (txSession == null) {

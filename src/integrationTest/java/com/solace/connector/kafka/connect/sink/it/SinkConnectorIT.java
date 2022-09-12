@@ -38,6 +38,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
@@ -574,6 +575,7 @@ public class SinkConnectorIT implements TestConstants {
                     ImmutableMap.of(AdditionalCheck.ATTACHMENTBYTEBUFFER, newRecordValue));
         }
 
+        @Disabled()
         @CartesianTest(name = "[{index}] dynamicDestination={0}, autoFlush={1}, kafka={2}")
         void testCommitRollback(@Values(booleans = { false, true }) boolean dynamicDestination,
                                 @Values(booleans = { false, true }) boolean autoFlush,
@@ -633,7 +635,7 @@ public class SinkConnectorIT implements TestConstants {
                         .contains("Document Is Too Large"), 30, TimeUnit.SECONDS);
                 if (autoFlush) {
                     logConsumer.waitUntil(frame -> frame.getUtf8String()
-                            .contains("RetriableException from SinkTask"), 30, TimeUnit.SECONDS);
+                            .contains("ConnectException from SinkTask"), 30, TimeUnit.SECONDS);
                 } else {
                     logConsumer.waitUntil(frame -> frame.getUtf8String()
                             .contains("Offset commit failed, rewinding to last committed offsets"), 1, TimeUnit.MINUTES);
