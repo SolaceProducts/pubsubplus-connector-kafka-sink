@@ -251,7 +251,7 @@ publishing {
                         name = "Support for Solace"
                         email = "support@solace.com"
                         organization = "Solace"
-                        organizationUrl = "http://solace.community"
+                        organizationUrl = "https://solace.community"
                     }
                 }
                 scm {
@@ -267,6 +267,7 @@ publishing {
             def releasesUrl = uri('http://apps-jenkins:9090/nexus/content/repositories/releases')
             def snapshotRepositoryUrl = uri('http://apps-jenkins:9090/nexus/content/repositories/snapshots')
             url = isSnapshot ? snapshotRepositoryUrl : releasesUrl
+            allowInsecureProtocol = true
             name = 'internal'
             credentials {
                 username = project.properties[name + "Username"]
