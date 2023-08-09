@@ -20,14 +20,14 @@ public class BitnamiKafkaConnectContainer extends GenericContainer<BitnamiKafkaC
 	private static final int BROKER_LISTENER_PORT = 9092;
 	private static final String BOOTSTRAP_LISTENER_NAME = "PLAINTEXT_HOST";
 	public static final int BOOTSTRAP_LISTENER_PORT = 29092;
-	public static final int CONNECT_PORT = 28083;
+	public static final int CONNECT_PORT = 8083;
 	private static final int ZOOKEEPER_PORT = 2181;
 	private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("bitnami/kafka");
-	private static final String DEFAULT_IMAGE_TAG = "2";
+	private static final String DEFAULT_IMAGE_TAG = "3.5";
 	private static final String STARTER_SCRIPT = "/testcontainers_start.sh";
 	private static final String PROPS_CONNECT = "/opt/bitnami/kafka/config/connect-distributed.properties";
 	private static final String PROPS_LOG4J = "/opt/bitnami/kafka/config/connect-log4j.properties";
-	private DockerImageName zookeeperDockerImageName = DockerImageName.parse("bitnami/zookeeper:3");
+	private DockerImageName zookeeperDockerImageName = DockerImageName.parse("bitnami/zookeeper:3.8");
 	private GenericContainer<?> zookeeperContainer;
 
 	public BitnamiKafkaConnectContainer() {
