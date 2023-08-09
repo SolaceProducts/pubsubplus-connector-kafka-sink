@@ -130,7 +130,7 @@ Refer to the in-line documentation of the [sample PubSub+ Kafka Sink Connector p
 
 ### Deployment
 
-The PubSub+ Sink Connector deployment has been tested on Apache Kafka 2.4 and Confluent Kafka 5.4 platforms. The Kafka software is typically placed under the root directory: `/opt/<provider>/<kafka or confluent-version>`.
+The PubSub+ Sink Connector deployment has been tested on Apache Kafka 3.5 and Confluent Kafka 7.4 platforms. The Kafka software is typically placed under the root directory: `/opt/<provider>/<kafka or confluent-version>`.
 
 Kafka distributions may be available as install bundles, Docker images, Kubernetes deployments, etc. They all support Kafka Connect which includes the scripts, tools and sample properties for Kafka connectors.
 
@@ -157,7 +157,7 @@ In this case the IP address is one of the nodes running the distributed mode wor
   {
     "class": "com.solace.connector.kafka.connect.sink.SolaceSinkConnector",
     "type": "sink",
-    "version": "2.1.0"
+    "version": "3.0.0"
   },
 ```
 
@@ -335,7 +335,7 @@ Kerberos has some very specific requirements to operate correctly. Some addition
 
 ### Build the Project
 
-JDK 8 or higher is required for this project.
+JDK 11 or higher is required for this project.
 
 1. First, clone this GitHub repo:
    ```shell
@@ -346,7 +346,7 @@ JDK 8 or higher is required for this project.
     ```shell
     git submodule update --init --recursive
     cd solace-integration-test-support
-    ./mvnw clean install -DskipTests
+    ./mvnw clean install -DskipTests -Dchangelist=
     cd ..
     ```
 3. Then run the build script:
@@ -376,13 +376,13 @@ To get started, import the following dependency into your project:
 <dependency>
    <groupId>com.solace.connector.kafka.connect</groupId>
    <artifactId>pubsubplus-connector-kafka-sink</artifactId>
-   <version>2.2.0</version>
+   <version>3.0.0</version>
 </dependency>
 ```
 
 **Gradle**
 ```groovy
-compile "com.solace.connector.kafka.connect:pubsubplus-connector-kafka-sink:2.2.0"
+compile "com.solace.connector.kafka.connect:pubsubplus-connector-kafka-sink:3.0.0"
 ```
 
 Now you can implement your custom `SolRecordProcessorIF`.
