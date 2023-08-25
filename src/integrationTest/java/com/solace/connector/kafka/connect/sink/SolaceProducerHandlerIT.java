@@ -1,6 +1,6 @@
 package com.solace.connector.kafka.connect.sink;
 
-import com.solace.connector.kafka.connect.sink.it.util.extensions.NetworkPubSubPlusExtension;
+import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.DeliveryMode;
@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-@ExtendWith(NetworkPubSubPlusExtension.class)
+@ExtendWith(PubSubPlusExtension.class)
 public class SolaceProducerHandlerIT {
 	private Map<String, String> properties;
 	private SolSessionHandler sessionHandler;

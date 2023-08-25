@@ -3,6 +3,7 @@ package com.solace.connector.kafka.connect.sink.it.util.extensions;
 import com.solace.connector.kafka.connect.sink.it.SolaceConnectorDeployment;
 import com.solace.connector.kafka.connect.sink.it.TestKafkaProducer;
 import com.solace.connector.kafka.connect.sink.it.util.KafkaConnection;
+import com.solace.connector.kafka.connect.sink.it.util.extensions.pubsubplus.NetworkPubSubPlusContainerProvider;
 import com.solace.connector.kafka.connect.sink.it.util.testcontainers.BitnamiKafkaConnectContainer;
 import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaConnectContainer;
 import com.solace.connector.kafka.connect.sink.it.util.testcontainers.ConfluentKafkaControlCenterContainer;
@@ -56,7 +57,7 @@ public class KafkaArgumentsProvider implements ArgumentsProvider,
 				.getOrComputeIfAbsent(BitnamiResource.class, c -> {
 					LOG.info("Creating Bitnami Kafka");
 					BitnamiKafkaConnectContainer container = new BitnamiKafkaConnectContainer()
-							.withNetwork(NetworkPubSubPlusExtension.DOCKER_NET);
+							.withNetwork(NetworkPubSubPlusContainerProvider.DOCKER_NET);
 					if (!container.isCreated()) {
 						container.start();
 					}
@@ -68,8 +69,8 @@ public class KafkaArgumentsProvider implements ArgumentsProvider,
 				.getStore(KafkaNamespace.CONFLUENT.getNamespace())
 				.getOrComputeIfAbsent(ConfluentResource.class, c -> {
 					LOG.info("Creating Confluent Kafka");
-					KafkaContainer kafkaContainer = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka").withTag("6.2.1"))
-							.withNetwork(NetworkPubSubPlusExtension.DOCKER_NET)
+					KafkaContainer kafkaContainer = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka").withTag("7.4.1"))
+							.withNetwork(NetworkPubSubPlusContainerProvider.DOCKER_NET)
 							.withNetworkAliases("kafka");
 					if (!kafkaContainer.isCreated()) {
 						kafkaContainer.start();

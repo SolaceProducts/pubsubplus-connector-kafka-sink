@@ -1,0 +1,1 @@
+com.solace.connector.kafka.connect.sink.it.util.extensions.pubsubplus.NetworkPubSubPlusContainerProvider

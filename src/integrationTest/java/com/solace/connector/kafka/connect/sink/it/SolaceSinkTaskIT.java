@@ -5,13 +5,13 @@ import com.solace.connector.kafka.connect.sink.SolSessionEventCallbackHandler;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
 import com.solace.connector.kafka.connect.sink.SolaceSinkSender;
 import com.solace.connector.kafka.connect.sink.SolaceSinkTask;
-import com.solace.connector.kafka.connect.sink.it.util.extensions.NetworkPubSubPlusExtension;
 import com.solace.connector.kafka.connect.sink.recordprocessor.SolDynamicDestinationRecordProcessor;
 import com.solace.connector.kafka.connect.sink.recordprocessor.SolSimpleRecordProcessor;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension;
 import com.solace.test.integration.junit.jupiter.extension.LogCaptorExtension.LogCaptor;
+import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension.JCSMPProxy;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension.ToxiproxyContext;
 import com.solace.test.integration.semp.v2.SempV2Api;
@@ -82,7 +82,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(LogCaptorExtension.class)
-@ExtendWith(NetworkPubSubPlusExtension.class)
+@ExtendWith(PubSubPlusExtension.class)
 public class SolaceSinkTaskIT {
 	private SolaceSinkTask solaceSinkTask;
 	private Map<String, String> connectorProperties;
@@ -100,7 +100,7 @@ public class SolaceSinkTaskIT {
 						.allowGuaranteedMsgSendEnabled(true)
 						.allowGuaranteedMsgReceiveEnabled(true)
 						.allowTransactedSessionsEnabled(true)
-						.clientProfileName(RandomStringUtils.randomAlphanumeric(30)), null)
+						.clientProfileName(RandomStringUtils.randomAlphanumeric(30)), null, null)
 				.getData()
 				.getClientProfileName();
 		logger.info("Created client profile {}", clientProfileName);
@@ -109,7 +109,7 @@ public class SolaceSinkTaskIT {
 						new ConfigMsgVpnClientUsername()
 								.clientUsername(RandomStringUtils.randomAlphanumeric(30))
 								.clientProfileName(clientProfileName)
-								.enabled(true), null)
+								.enabled(true), null, null)
 				.getData();
 		clientUsernameName = clientUsername.getClientUsername();
 		logger.info("Created client username {}", clientUsernameName);
@@ -158,7 +158,7 @@ public class SolaceSinkTaskIT {
 
 		sempV2Api.config().updateMsgVpnClientProfile(connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME),
 				clientProfileName,
-				new ConfigMsgVpnClientProfile().allowGuaranteedMsgSendEnabled(false), null);
+				new ConfigMsgVpnClientProfile().allowGuaranteedMsgSendEnabled(false), null, null);
 
 		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.start(connectorProperties));
 		assertThat(thrown.getMessage(), containsString("Failed to setup sender to PubSub+"));
@@ -173,7 +173,7 @@ public class SolaceSinkTaskIT {
 
 		sempV2Api.config().updateMsgVpnClientProfile(connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME),
 				clientProfileName,
-				new ConfigMsgVpnClientProfile().allowTransactedSessionsEnabled(false), null);
+				new ConfigMsgVpnClientProfile().allowTransactedSessionsEnabled(false), null, null);
 
 		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.start(connectorProperties));
 		assertThat(thrown.getCause(), instanceOf(JCSMPException.class));
@@ -312,8 +312,8 @@ public class SolaceSinkTaskIT {
 
 		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
 		sempV2Api.config().createMsgVpnQueueSubscription(vpnName, queue.getName(), new ConfigMsgVpnQueueSubscription()
-				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null);
-		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null);
+				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null, null);
+		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null, null);
 
 		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
 			while (sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
@@ -343,7 +343,8 @@ public class SolaceSinkTaskIT {
 		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
 		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
 		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
-		assertEquals(2, sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null)
+		// only 1 message is logged to the broker for failure
+		assertEquals(1, sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null)
 				.getData().getMaxMsgSizeExceededDiscardedMsgCount());
 	}
 
@@ -368,10 +369,10 @@ public class SolaceSinkTaskIT {
 
 		if (destinationType.isAssignableFrom(Topic.class)) {
 			sempV2Api.config().createMsgVpnQueueSubscription(vpnName, queue.getName(),
-					new ConfigMsgVpnQueueSubscription().subscriptionTopic(topicName), null);
+					new ConfigMsgVpnQueueSubscription().subscriptionTopic(topicName), null, null);
 		}
 
-		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null);
+		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null, null);
 		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
 			while (sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
 					.getMaxMsgSize() != 1) {
@@ -433,7 +434,7 @@ public class SolaceSinkTaskIT {
 
 		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
 		sempV2Api.config().createMsgVpnQueueSubscription(vpnName, queue.getName(), new ConfigMsgVpnQueueSubscription()
-				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null);
+				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null, null);
 
 		solaceSinkTask.start(connectorProperties);
 
@@ -529,7 +530,7 @@ public class SolaceSinkTaskIT {
 		if (destinationType.isAssignableFrom(Topic.class)) {
 			sempV2Api.config().createMsgVpnQueueSubscription(connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME),
 					queue.getName(), new ConfigMsgVpnQueueSubscription()
-							.subscriptionTopic(topicName), null);
+							.subscriptionTopic(topicName), null, null);
 		}
 
 		solaceSinkTask.start(connectorProperties);

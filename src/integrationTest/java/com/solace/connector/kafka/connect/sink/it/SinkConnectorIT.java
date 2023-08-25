@@ -8,10 +8,11 @@ import com.solace.connector.kafka.connect.sink.it.util.ThrowingFunction;
 import com.solace.connector.kafka.connect.sink.it.util.extensions.KafkaArgumentsProvider;
 import com.solace.connector.kafka.connect.sink.it.util.extensions.KafkaArgumentsProvider.KafkaContext;
 import com.solace.connector.kafka.connect.sink.it.util.extensions.KafkaArgumentsProvider.KafkaSource;
-import com.solace.connector.kafka.connect.sink.it.util.extensions.NetworkPubSubPlusExtension;
+import com.solace.connector.kafka.connect.sink.it.util.extensions.pubsubplus.NetworkPubSubPlusContainerProvider;
 import com.solace.connector.kafka.connect.sink.recordprocessor.SolDynamicDestinationRecordProcessor;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
+import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension.JCSMPProxy;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension.ToxiproxyContext;
 import com.solace.test.integration.semp.v2.SempV2Api;
@@ -44,7 +45,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
@@ -79,6 +79,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @ExtendWith(ExecutorServiceExtension.class)
+@ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(KafkaArgumentsProvider.AutoDeleteSolaceConnectorDeploymentAfterEach.class)
 public class SinkConnectorIT implements TestConstants {
 
@@ -89,9 +90,6 @@ public class SinkConnectorIT implements TestConstants {
     enum AdditionalCheck { ATTACHMENTBYTEBUFFER, CORRELATIONID }
 
     private Properties connectorProps;
-
-    @RegisterExtension
-    public static final NetworkPubSubPlusExtension PUB_SUB_PLUS_EXTENSION = new NetworkPubSubPlusExtension();
 
     ////////////////////////////////////////////////////
     // Main setup/teardown
@@ -110,7 +108,7 @@ public class SinkConnectorIT implements TestConstants {
     @BeforeEach
     public void beforeEach(JCSMPProperties jcsmpProperties) {
         connectorProps = new Properties();
-        connectorProps.setProperty(SolaceSinkConstants.SOL_HOST, String.format("tcp://%s:55555", PUB_SUB_PLUS_EXTENSION.getNetworkAlias()));
+        connectorProps.setProperty(SolaceSinkConstants.SOL_HOST, String.format("tcp://%s:55555", NetworkPubSubPlusContainerProvider.DOCKER_NET_PUBSUB_ALIAS));
         connectorProps.setProperty(SolaceSinkConstants.SOL_USERNAME, jcsmpProperties.getStringProperty(JCSMPProperties.USERNAME));
         connectorProps.setProperty(SolaceSinkConstants.SOL_PASSWORD, jcsmpProperties.getStringProperty(JCSMPProperties.PASSWORD));
         connectorProps.setProperty(SolaceSinkConstants.SOL_VPN_NAME, jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME));
@@ -603,9 +601,9 @@ public class SinkConnectorIT implements TestConstants {
             connectorProps.setProperty("errors.retry.timeout", Long.toString(-1));
 
             sempV2Api.config().updateMsgVpnQueue(SOL_VPN, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1),
-                    null);
+                    null, null);
             sempV2Api.config().createMsgVpnQueueSubscription(SOL_VPN, queue.getName(),
-                    new ConfigMsgVpnQueueSubscription().subscriptionTopic(topicName), null);
+                    new ConfigMsgVpnQueueSubscription().subscriptionTopic(topicName), null, null);
             assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
                 while (sempV2Api.monitor().getMsgVpnQueue(SOL_VPN, queue.getName(), null).getData()
                         .getMaxMsgSize() != 1) {
@@ -648,7 +646,7 @@ public class SinkConnectorIT implements TestConstants {
                 executorService.schedule(() -> {
                     logger.info("Restoring max message size for queue {}", queue.getName());
                     return sempV2Api.config().updateMsgVpnQueue(SOL_VPN, queue.getName(),
-                            new ConfigMsgVpnQueue().maxMsgSize(10000000), null);
+                            new ConfigMsgVpnQueue().maxMsgSize(10000000), null, null);
                 }, 5, TimeUnit.SECONDS);
 
                 logger.info("Waiting for Solace transaction to be committed");
