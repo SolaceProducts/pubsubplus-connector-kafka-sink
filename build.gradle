@@ -1,5 +1,8 @@
 import com.github.spotbugs.snom.SpotBugsTask
 import io.github.gradlenexus.publishplugin.InitializeNexusStagingRepository
+import groovy.json.JsonOutput
+import groovy.text.GStringTemplateEngine
+import jdk.nashorn.internal.ir.debug.JSONWriter
 
 plugins {
     id 'java-library'
@@ -76,6 +79,31 @@ spotbugs {
     reportLevel 'high' // Decrease to medium once medium errors are fixed
 }
 
+// Generate manifest.json file to be compliant with Confluent Hub client
+tasks.register("genarateKafkaConnectManifestFile") {
+
+    def manifestJsonTemplate = new File('manifest.json.template')
+    def bindMap = [
+            "FEATURE_CONFLUENT_CONTROL_CENTER_INTEGRATION_ENABLED": false,
+            "FEATURE_KAFKA_CONNECT_API_ENABLED": true,
+            "FEATURE_SINGLE_MESSAGE_TRANSFORMS_ENABLED": true,
+            "COMPONENT_NAME": project.name,
+            "RELEASE_DATE": new Date().format("yyyy-MM-dd"),
+            "VERSION": project.version
+            ]
+
+    def manifestJson = JsonOutput.unescaped(
+            new GStringTemplateEngine()
+            .createTemplate(manifestJsonTemplate)
+            .make(bindMap)
+            .toString()
+    )
+
+    new File(project.projectDir.toString() + "/manifest.json").write JsonOutput.prettyPrint(JsonOutput.toJson(manifestJson))
+}
+
+tasks.genarateKafkaConnectManifestFile.dependsOn assemble
+
 spotbugsIntegrationTest {
     enabled = false
 }
@@ -116,13 +144,13 @@ project.integrationTest {
         maxRetries = 3
     }
     afterSuite { desc, result ->
-      if (!desc.parent)
-          println("${result.resultType} " +
-              "(${result.testCount} tests, " +
-              "${result.successfulTestCount} successes, " +
-              "${result.failedTestCount} failures, " +
-              "${result.skippedTestCount} skipped)")
-      }
+        if (!desc.parent)
+            println("${result.resultType} " +
+                    "(${result.testCount} tests, " +
+                    "${result.successfulTestCount} successes, " +
+                    "${result.failedTestCount} failures, " +
+                    "${result.skippedTestCount} skipped)")
+    }
 }
 
 project.test {
@@ -167,7 +195,7 @@ task('pmdMainSarif') {
             }
 
             Provider<RegularFile> reportsDir = project.getLayout()
-                    .file(project.getProviders().provider({a -> extension.getReportsDir()}) as Provider<File>)
+                    .file(project.getProviders().provider({ a -> extension.getReportsDir() }) as Provider<File>)
             formatter(type: 'sarif', toFile: new File(reportsDir.get().getAsFile(), 'main.sarif'))
             formatter(type: 'html', toFile: new File(reportsDir.get().getAsFile(), 'main.html'))
 
@@ -230,6 +258,7 @@ distributions {
             from('doc/distribution-readme.md') { into 'doc' }
             from('LICENSE') { into 'doc' }
             from('THIRD-PARTY-LICENSES') { into 'doc' }
+            from('manifest.json') { into '' }
             into('lib') {
                 from jar
                 from(project.configurations.runtimeClasspath)
@@ -310,7 +339,7 @@ signing {
 
 tasks.withType(Sign) {
     onlyIf {
-        gradle.taskGraph.allTasks.any {task ->
+        gradle.taskGraph.allTasks.any { task ->
             task.name.startsWith("publish") && task.name.contains('Sonatype')
         }
     }
