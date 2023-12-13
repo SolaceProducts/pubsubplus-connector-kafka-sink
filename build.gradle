@@ -1,8 +1,5 @@
 import com.github.spotbugs.snom.SpotBugsTask
 import io.github.gradlenexus.publishplugin.InitializeNexusStagingRepository
-import groovy.json.JsonOutput
-import groovy.text.GStringTemplateEngine
-import jdk.nashorn.internal.ir.debug.JSONWriter
 
 plugins {
     id 'java-library'
@@ -80,29 +77,14 @@ spotbugs {
 }
 
 // Generate manifest.json file to be compliant with Confluent Hub client
-tasks.register("genarateKafkaConnectManifestFile") {
-
-    def manifestJsonTemplate = new File('manifest.json.template')
-    def bindMap = [
-            "FEATURE_CONFLUENT_CONTROL_CENTER_INTEGRATION_ENABLED": false,
-            "FEATURE_KAFKA_CONNECT_API_ENABLED": true,
-            "FEATURE_SINGLE_MESSAGE_TRANSFORMS_ENABLED": true,
-            "COMPONENT_NAME": project.name,
-            "RELEASE_DATE": new Date().format("yyyy-MM-dd"),
-            "VERSION": project.version
-            ]
-
-    def manifestJson = JsonOutput.unescaped(
-            new GStringTemplateEngine()
-            .createTemplate(manifestJsonTemplate)
-            .make(bindMap)
-            .toString()
-    )
-
-    new File(project.projectDir.toString() + "/manifest.json").write JsonOutput.prettyPrint(JsonOutput.toJson(manifestJson))
+tasks.register('generateConfluentConnectManifest', Copy) {
+    def templateContext = [
+            "project": project.properties
+    ]
+    from 'src/template/manifest'
+    into "${buildDir}/generated/manifest"
+    expand templateContext
 }
-
-tasks.genarateKafkaConnectManifestFile.dependsOn assemble
 
 spotbugsIntegrationTest {
     enabled = false
@@ -258,7 +240,7 @@ distributions {
             from('doc/distribution-readme.md') { into 'doc' }
             from('LICENSE') { into 'doc' }
             from('THIRD-PARTY-LICENSES') { into 'doc' }
-            from('manifest.json') { into '' }
+            from(generateConfluentConnectManifest) {into ''}
             into('lib') {
                 from jar
                 from(project.configurations.runtimeClasspath)

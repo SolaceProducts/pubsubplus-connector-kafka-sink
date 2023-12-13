@@ -1,32 +1,31 @@
 {
-    "author": "Solace",
     "component_types": [
         "sink"
     ],
     "description": "The PubSub+ Kafka Sink Connector consumes Kafka topic records and streams them to the PubSub+ Event Mesh as topic and/or queue data events.",
-    "documentationUrl": "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink",
+    "documentation_url": "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink",
     "features": {
-        "confluent_control_center_integration": $FEATURE_CONFLUENT_CONTROL_CENTER_INTEGRATION_ENABLED,
-        "kafka_connect_api": $FEATURE_KAFKA_CONNECT_API_ENABLED,
-        "single_message_transforms": $FEATURE_SINGLE_MESSAGE_TRANSFORMS_ENABLED,
+        "confluent_control_center_integration": false,
+        "kafka_connect_api": true,
+        "single_message_transforms": true,
         "supported_encodings": [
             "any"
         ]
     },
     "license": [
         {
-            "name": "he Apache Software License, Version 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+            "name": "Apache License, Version 2.0",
+            "url": "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink/blob/master/LICENSE"
         }
     ],
-    "name": "$COMPONENT_NAME",
+    "name": "${project.name}",
     "owner": {
         "name": "Solace",
         "type": "organization",
-        "url": "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink",
-        "username": "SolaceProducts"
+        "url": "https://solace.community",
+        "username": "solace"
     },
-    "release_date": "$RELEASE_DATE",
+    "release_date": "${new Date().format('yyyy-MM-dd')}",
     "source_url": "https://github.com/SolaceProducts/pubsubplus-connector-kafka-sink",
     "support": {
         "provider_name": "Solace",
@@ -40,5 +39,5 @@
         "connector"
     ],
     "title": "Solace PubSub+ Connector for Kafka: Sink",
-    "version": "$VERSION"
+    "version": "${project.version}"
 }

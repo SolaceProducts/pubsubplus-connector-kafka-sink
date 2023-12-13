@@ -49,4 +49,3 @@ src/integrationTest/resources/pubsubplus-connector-kafka*/
 
 # Local testing
 solace.properties
-manifest.json
