@@ -8,4 +8,5 @@ Package directory contents:
 
 - doc: this readme and license information
 - lib: Sink Connector jar file and dependencies
-- etc: sample configuration properties and JSON file 
+- etc: sample configuration properties and JSON file
+- manifest.json: manifest file for kafka-connect to be installable via confluent-hub client

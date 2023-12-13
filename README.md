@@ -161,7 +161,7 @@ In this case the IP address is one of the nodes running the distributed mode wor
   {
     "class": "com.solace.connector.kafka.connect.sink.SolaceSinkConnector",
     "type": "sink",
-    "version": "3.0.0"
+    "version": "3.0.1"
   },
 ```
 
