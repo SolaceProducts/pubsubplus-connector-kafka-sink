@@ -161,7 +161,7 @@ In this case the IP address is one of the nodes running the distributed mode wor
   {
     "class": "com.solace.connector.kafka.connect.sink.SolaceSinkConnector",
     "type": "sink",
-    "version": "3.0.1"
+    "version": "3.1.0"
   },
 ```
 
@@ -380,13 +380,13 @@ To get started, import the following dependency into your project:
 <dependency>
    <groupId>com.solace.connector.kafka.connect</groupId>
    <artifactId>pubsubplus-connector-kafka-sink</artifactId>
-   <version>3.0.0</version>
+   <version>3.1.0</version>
 </dependency>
 ```
 
 **Gradle**
 ```groovy
-compile "com.solace.connector.kafka.connect:pubsubplus-connector-kafka-sink:3.0.0"
+compile "com.solace.connector.kafka.connect:pubsubplus-connector-kafka-sink:3.1.0"
 ```
 
 Now you can implement your custom `SolRecordProcessorIF`.
