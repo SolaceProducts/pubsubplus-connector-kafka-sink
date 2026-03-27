@@ -1,13 +1,9 @@
 package com.solace.connector.kafka.connect.sink.it;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.either;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasItems;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -50,7 +46,6 @@ import com.solacesystems.jcsmp.transaction.RollbackException;
 import eu.rekawek.toxiproxy.model.ToxicDirection;
 import eu.rekawek.toxiproxy.model.toxic.Latency;
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -60,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -86,7 +82,7 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(LogCaptorExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
-public class SolaceSinkTaskIT {
+class SolaceSinkTaskIT {
 	private SolaceSinkTask solaceSinkTask;
 	private Map<String, String> connectorProperties;
 	private String clientProfileName;
@@ -144,18 +140,20 @@ public class SolaceSinkTaskIT {
 	}
 
 	@Test
-	public void testNoProvidedMessageProcessor() {
+	void testNoProvidedMessageProcessor() {
 		connectorProperties.remove(SolaceSinkConstants.SOL_RECORD_PROCESSOR);
-		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.start(connectorProperties));
-		assertThat(thrown.getMessage(), containsString("Failed to setup sender to PubSub+"));
-		assertThat(thrown.getCause(), instanceOf(KafkaException.class));
-		assertThat(thrown.getCause().getMessage(), containsString(
-				"Could not find a public no-argument constructor for " + SolRecordProcessorIF.class.getName()));
+		assertThatThrownBy(() -> solaceSinkTask.start(connectorProperties))
+				.isInstanceOf(ConnectException.class)
+				.hasMessageContaining("Failed to setup sender to PubSub+")
+				.cause()
+				.isInstanceOf(KafkaException.class)
+				.hasMessageContaining("Could not find a public no-argument constructor for %s",
+						SolRecordProcessorIF.class.getName());
 	}
 
 	@ParameterizedTest(name = "[{index}] transacted={0}")
 	@ValueSource(booleans = { true, false })
-	public void testFailCreateQueueProducer(boolean transacted, SempV2Api sempV2Api, Queue queue) throws Exception {
+	void testFailCreateQueueProducer(boolean transacted, SempV2Api sempV2Api, Queue queue) throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(transacted));
 
@@ -163,14 +161,16 @@ public class SolaceSinkTaskIT {
 				clientProfileName,
 				new ConfigMsgVpnClientProfile().allowGuaranteedMsgSendEnabled(false), null, null);
 
-		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.start(connectorProperties));
-		assertThat(thrown.getMessage(), containsString("Failed to setup sender to PubSub+"));
-		assertThat(thrown.getCause(), instanceOf(JCSMPException.class));
-		assertThat(thrown.getCause().getMessage(), containsString("Router does not support guaranteed publisher flows"));
+		assertThatThrownBy(() -> solaceSinkTask.start(connectorProperties))
+				.isInstanceOf(ConnectException.class)
+				.hasMessageContaining("Failed to setup sender to PubSub+")
+				.cause()
+				.isInstanceOf(JCSMPException.class)
+				.hasMessageContaining("Router does not support guaranteed publisher flows");
 	}
 
 	@Test
-	public void testFailTransactedSessionCreation(SempV2Api sempV2Api, Queue queue) throws Exception {
+	void testFailTransactedSessionCreation(SempV2Api sempV2Api, Queue queue) throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, "true");
 
@@ -178,14 +178,16 @@ public class SolaceSinkTaskIT {
 				clientProfileName,
 				new ConfigMsgVpnClientProfile().allowTransactedSessionsEnabled(false), null, null);
 
-		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.start(connectorProperties));
-		assertThat(thrown.getCause(), instanceOf(JCSMPException.class));
-		assertThat(thrown.getCause().getMessage(), containsString("Router does not support transacted sessions"));
+		assertThatThrownBy(() -> solaceSinkTask.start(connectorProperties))
+				.isInstanceOf(ConnectException.class)
+				.cause()
+				.isInstanceOf(JCSMPException.class)
+				.hasMessageContaining("Router does not support transacted sessions");
 	}
 
 	@ParameterizedTest
 	@ValueSource(classes = {Queue.class, Topic.class})
-	public void testSendThrowsJCSMPException(Class<Destination> destinationType, Queue queue) {
+	void testSendThrowsJCSMPException(Class<Destination> destinationType, Queue queue) {
 		if (destinationType.isAssignableFrom(Queue.class)) {
 			connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
 		} else {
@@ -199,17 +201,16 @@ public class SolaceSinkTaskIT {
 				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0);
 
 		solaceSinkTask.stop();
-		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(
-				Collections.singleton(sinkRecord)));
-		assertThat(thrown, instanceOf(ConnectException.class));
-		assertThat(thrown.getMessage(), containsString("Received exception while sending message to " +
-				(destinationType.isAssignableFrom(Queue.class) ? "queue" : "topic")));
-		assertThat(thrown.getCause(), instanceOf(ClosedFacilityException.class));
+		assertThatThrownBy(() -> solaceSinkTask.put(Collections.singleton(sinkRecord)))
+				.isInstanceOf(ConnectException.class)
+				.hasMessageContaining("Received exception while sending message to %s",
+						destinationType.isAssignableFrom(Queue.class) ? "queue" : "topic")
+				.hasCauseInstanceOf(ClosedFacilityException.class);
 	}
 
 	@ParameterizedTest(name = "[{index}] destinationType={0}")
 	@ValueSource(classes = {Queue.class, Topic.class})
-	public void testDynamicSendThrowsJCSMPException(Class<Destination> destinationType, Queue queue) {
+	void testDynamicSendThrowsJCSMPException(Class<Destination> destinationType, Queue queue) {
 		connectorProperties.put(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Boolean.toString(true));
 		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, DynamicDestinationTypeRecordProcessor.class
 				.getName());
@@ -226,18 +227,17 @@ public class SolaceSinkTaskIT {
 				.addString(DynamicDestinationTypeRecordProcessor.HEADER_DYNAMIC_DESTINATION_TYPE, destinationType.getName());
 
 		solaceSinkTask.stop();
-		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(
-				Collections.singleton(sinkRecord)));
-		assertThat(thrown, instanceOf(ConnectException.class));
-		assertThat(thrown.getMessage(), containsString("Received exception while sending message to topic"));
-		assertThat(thrown.getCause(), instanceOf(ClosedFacilityException.class));
+		assertThatThrownBy(() -> solaceSinkTask.put(Collections.singleton(sinkRecord)))
+				.isInstanceOf(ConnectException.class)
+				.hasMessageContaining("Received exception while sending message to topic")
+				.hasCauseInstanceOf(ClosedFacilityException.class);
 	}
 
 	@ParameterizedTest(name = "[{index}] ignoreRecordProcessorError={0}")
 	@ValueSource(booleans = { true, false })
-	public void testInvalidDynamicDestination(boolean ignoreRecordProcessorError,
+	void testInvalidDynamicDestination(boolean ignoreRecordProcessorError,
 											  @ExecSvc ExecutorService executorService,
-											  @LogCaptor(SolaceSinkSender.class) BufferedReader logReader) throws Exception {
+											  @LogCaptor(SolaceSinkSender.class) BufferedReader logReader) {
 		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, BadSolDynamicDestinationRecordProcessor.class.getName());
 		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR, Boolean.toString(ignoreRecordProcessorError));
 		connectorProperties.put(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Boolean.toString(true));
@@ -249,31 +249,30 @@ public class SolaceSinkTaskIT {
 				RandomStringUtils.insecure().nextAlphanumeric(100)).getBytes(StandardCharsets.UTF_8), 0));
 
 		if (ignoreRecordProcessorError) {
-			Future<?> future = executorService.submit(() -> {
+			Future<?> future = executorService.submit((Callable<?>) () -> {
 				String logLine;
 				do {
-					try {
-						logLine = logReader.readLine();
-					} catch (IOException e) {
-						throw new RuntimeException(e);
-					}
+					logLine = logReader.readLine();
 				} while (!logLine.contains("Received exception retrieving Dynamic Destination"));
+				return null;
 			});
 			solaceSinkTask.put(records);
-			future.get(30, TimeUnit.SECONDS);
+			assertThat(future).succeedsWithin(30, TimeUnit.SECONDS);
 		} else {
-			ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(records));
-			assertThat(thrown.getMessage(), containsString("Received exception retrieving Dynamic Destination"));
-			assertThat(thrown.getCause(), instanceOf(SDTException.class));
-			assertThat(thrown.getCause().getMessage(), containsString("No conversion from String to Destination"));
+			assertThatThrownBy(() -> solaceSinkTask.put(records))
+					.isInstanceOf(ConnectException.class)
+					.hasMessageContaining("Received exception retrieving Dynamic Destination")
+					.cause()
+					.isInstanceOf(SDTException.class)
+					.hasMessageContaining("No conversion from String to Destination");
 		}
 	}
 
 	@ParameterizedTest(name = "[{index}] ignoreRecordProcessorError={0}")
 	@ValueSource(booleans = { true, false })
-	public void testRecordProcessorError(boolean ignoreRecordProcessorError,
+	void testRecordProcessorError(boolean ignoreRecordProcessorError,
 										 @ExecSvc ExecutorService executorService,
-										 @LogCaptor(SolaceSinkSender.class) BufferedReader logReader) throws Exception {
+										 @LogCaptor(SolaceSinkSender.class) BufferedReader logReader) {
 		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR, BadRecordProcessor.class.getName());
 		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR, Boolean.toString(ignoreRecordProcessorError));
 		solaceSinkTask.start(connectorProperties);
@@ -283,28 +282,26 @@ public class SolaceSinkTaskIT {
 				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0));
 
 		if (ignoreRecordProcessorError) {
-			Future<?> future = executorService.submit(() -> {
+			Future<?> future = executorService.submit((Callable<?>) () -> {
 				String logLine;
 				do {
-					try {
-						logLine = logReader.readLine();
-					} catch (IOException e) {
-						throw new RuntimeException(e);
-					}
+					logLine = logReader.readLine();
 				} while (!logLine.contains("Encountered exception in record processing"));
+				return null;
 			});
 			solaceSinkTask.put(records);
-			future.get(30, TimeUnit.SECONDS);
+			assertThat(future).succeedsWithin(30, TimeUnit.SECONDS);
 		} else {
-			ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(records));
-			assertThat(thrown.getMessage(), containsString("Encountered exception in record processing"));
-			assertEquals(BadRecordProcessor.TEST_EXCEPTION, thrown.getCause());
+			assertThatThrownBy(() -> solaceSinkTask.put(records))
+					.isInstanceOf(ConnectException.class)
+					.hasMessageContaining("Encountered exception in record processing")
+					.hasCause(BadRecordProcessor.TEST_EXCEPTION);
 		}
 	}
 
 	@ParameterizedTest(name = "[{index}] autoFlush={0}")
 	@ValueSource(booleans = {false, true})
-	public void testCommitRollback(boolean autoFlush, SempV2Api sempV2Api, Queue queue) throws Exception {
+	void testCommitRollback(boolean autoFlush, SempV2Api sempV2Api, Queue queue) throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
 		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.insecure().nextAlphanumeric(100));
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
@@ -344,19 +341,21 @@ public class SolaceSinkTaskIT {
 			thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.flush(currentOffsets));
 		}
 
-		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
-		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
-		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
+		assertThat(thrown)
+				.hasMessageContaining("Error in committing transaction")
+				.cause()
+				.isInstanceOf(RollbackException.class)
+				.hasMessageContaining("Document Is Too Large");
 
 		// If the txn fails and needs to rollback, the API might not try to send subsequent messages to the broker.
 		// Resulting in only 1 failed message being reported by the broker.
 		assertThat(sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
-						.getMaxMsgSizeExceededDiscardedMsgCount(),
-				either(equalTo(1L)).or(equalTo(2L)));
+						.getMaxMsgSizeExceededDiscardedMsgCount())
+				.isIn(1L, 2L);
 	}
 
 	@CartesianTest(name = "[{index}] destinationType={0}, autoFlush={1}")
-	public void testDynamicDestinationCommitRollback(
+	void testDynamicDestinationCommitRollback(
 			@Values(classes = {Queue.class, Topic.class}) Class<Destination> destinationType,
 			@Values(booleans = {false, true}) boolean autoFlush,
 			SempV2Api sempV2Api,
@@ -411,17 +410,20 @@ public class SolaceSinkTaskIT {
 			thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.flush(currentOffsets));
 		}
 
-		assertThat(thrown.getMessage(), containsString("Error in committing transaction"));
-		assertThat(thrown.getCause(), instanceOf(RollbackException.class));
-		assertThat(thrown.getCause().getMessage(), containsString("Document Is Too Large"));
-		assertEquals(1, sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null)
-				.getData().getMaxMsgSizeExceededDiscardedMsgCount());
+		assertThat(thrown)
+				.hasMessageContaining("Error in committing transaction")
+				.cause()
+				.isInstanceOf(RollbackException.class)
+				.hasMessageContaining("Document Is Too Large");
+		assertThat(sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
+				.getMaxMsgSizeExceededDiscardedMsgCount())
+				.isEqualTo(1);
 	}
 
 	@Disabled()
 	@ParameterizedTest(name = "[{index}] autoFlush={0}")
 	@ValueSource(booleans = {false, true})
-	public void testLongCommit(boolean autoFlush,
+	void testLongCommit(boolean autoFlush,
 							   @JCSMPProxy JCSMPSession jcsmpSession,
 							   SempV2Api sempV2Api,
 							   Queue queue,
@@ -457,34 +459,26 @@ public class SolaceSinkTaskIT {
 		Latency lag = jcsmpProxyContext.getProxy().toxics()
 				.latency("lag", ToxicDirection.UPSTREAM, TimeUnit.HOURS.toMillis(1));
 
-		Future<?> future = executorService.submit(() -> {
+		Future<?> future = executorService.submit((Callable<?>) () -> {
 			String logLine;
 			do {
-				try {
-					logLine = logReader.readLine();
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
+				logLine = logReader.readLine();
 			} while (!logLine.contains("Received Session Event " + SessionEvent.RECONNECTING));
 
-			try {
-				Thread.sleep(TimeUnit.SECONDS.toMillis(5));
-			} catch (InterruptedException ignored) {}
+			Thread.sleep(TimeUnit.SECONDS.toMillis(5));
 
-			try {
-				logger.info("Restoring JCSMP upstream");
-				lag.remove();
-				logger.info("JCSMP upstream restored");
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
+			logger.info("Restoring JCSMP upstream");
+			lag.remove();
+			logger.info("JCSMP upstream restored");
+
+			return null;
 		});
 
 		assertTimeoutPreemptively(Duration.ofMinutes(5), () -> {
 			solaceSinkTask.put(Collections.singleton(sinkRecord));
 			solaceSinkTask.flush(currentOffsets);
 		});
-		future.get(30, TimeUnit.SECONDS);
+		assertThat(future).succeedsWithin(30, TimeUnit.SECONDS);
 
 		List<Destination> receivedDestinations = new ArrayList<>();
 		ConsumerFlowProperties consumerFlowProperties = new ConsumerFlowProperties();
@@ -505,13 +499,14 @@ public class SolaceSinkTaskIT {
 			flow.close();
 		}
 
-		assertThat(receivedDestinations, hasItems(queue,
-				JCSMPFactory.onlyInstance().createTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS))));
+		assertThat(receivedDestinations).containsExactlyInAnyOrder(
+				queue,
+				JCSMPFactory.onlyInstance().createTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)));
 	}
 
 	@Disabled()
 	@CartesianTest(name = "[{index}] destinationType={0}, autoFlush={1}")
-	public void testDynamicDestinationLongCommit(
+	void testDynamicDestinationLongCommit(
 			@Values(classes = {Queue.class, Topic.class}) Class<Destination> destinationType,
 			@Values(booleans = {false, true}) boolean autoFlush,
 			@JCSMPProxy JCSMPSession jcsmpSession,
@@ -561,34 +556,26 @@ public class SolaceSinkTaskIT {
 		Latency lag = jcsmpProxyContext.getProxy().toxics()
 				.latency("lag", ToxicDirection.UPSTREAM, TimeUnit.HOURS.toMillis(1));
 
-		Future<?> future = executorService.submit(() -> {
+		Future<?> future = executorService.submit((Callable<?>) () -> {
 			String logLine;
 			do {
-				try {
 					logLine = logReader.readLine();
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
 			} while (!logLine.contains("Received Session Event " + SessionEvent.RECONNECTING));
 
-			try {
-				Thread.sleep(TimeUnit.SECONDS.toMillis(5));
-			} catch (InterruptedException ignored) {}
+			Thread.sleep(TimeUnit.SECONDS.toMillis(5));
 
-			try {
-				logger.info("Restoring JCSMP upstream");
-				lag.remove();
-				logger.info("JCSMP upstream restored");
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
+			logger.info("Restoring JCSMP upstream");
+			lag.remove();
+			logger.info("JCSMP upstream restored");
+
+			return null;
 		});
 
 		assertTimeoutPreemptively(Duration.ofMinutes(5), () -> {
 			solaceSinkTask.put(Collections.singleton(sinkRecord));
 			solaceSinkTask.flush(currentOffsets);
 		});
-		future.get(30, TimeUnit.SECONDS);
+		assertThat(future).succeedsWithin(30, TimeUnit.SECONDS);
 
 		ConsumerFlowProperties consumerFlowProperties = new ConsumerFlowProperties();
 		consumerFlowProperties.setEndpoint(queue);
@@ -608,15 +595,15 @@ public class SolaceSinkTaskIT {
 		static final RuntimeException TEST_EXCEPTION = new RuntimeException("Some processing failure");
 
 		@Override
-		public BytesXMLMessage processRecord(String skey, SinkRecord record) {
+		public BytesXMLMessage processRecord(String skey, SinkRecord sinkRecord) {
 			throw TEST_EXCEPTION;
 		}
 	}
 
 	public static class BadSolDynamicDestinationRecordProcessor extends SolDynamicDestinationRecordProcessor {
 		@Override
-		public BytesXMLMessage processRecord(String skey, SinkRecord record) {
-			BytesXMLMessage msg = super.processRecord(skey, record);
+		public BytesXMLMessage processRecord(String skey, SinkRecord sinkRecord) {
+			BytesXMLMessage msg = super.processRecord(skey, sinkRecord);
 			try {
 				msg.getProperties().putString("dynamicDestination", "abc");
 			} catch (SDTException e) {
@@ -632,11 +619,11 @@ public class SolaceSinkTaskIT {
 		private static final Logger logger = LoggerFactory.getLogger(DynamicDestinationTypeRecordProcessor.class);
 
 		@Override
-		public BytesXMLMessage processRecord(String skey, SinkRecord record) {
+		public BytesXMLMessage processRecord(String skey, SinkRecord sinkRecord) {
 			try {
-				String dynamicDestinationName = (String) record.headers().lastWithName(HEADER_DYNAMIC_DESTINATION)
+				String dynamicDestinationName = (String) sinkRecord.headers().lastWithName(HEADER_DYNAMIC_DESTINATION)
 						.value();
-				Class<?> dynamicDestinationType = Class.forName((String) record.headers()
+				Class<?> dynamicDestinationType = Class.forName((String) sinkRecord.headers()
 						.lastWithName(HEADER_DYNAMIC_DESTINATION_TYPE).value());
 
 				Destination dynamicDestination = dynamicDestinationType.isAssignableFrom(Queue.class) ?
@@ -644,7 +631,7 @@ public class SolaceSinkTaskIT {
 						JCSMPFactory.onlyInstance().createTopic(dynamicDestinationName);
 				logger.info("Parsed dynamic destination {} {}", dynamicDestinationType.getSimpleName(), dynamicDestination);
 
-				BytesXMLMessage msg = super.processRecord(skey, record);
+				BytesXMLMessage msg = super.processRecord(skey, sinkRecord);
 				msg.getProperties().putDestination("dynamicDestination", dynamicDestination);
 				return msg;
 			} catch (SDTException | ClassNotFoundException e) {

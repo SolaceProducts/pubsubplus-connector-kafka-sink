@@ -3,12 +3,8 @@ package com.solace.connector.kafka.connect.sink.it;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.hasItems;
-import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -81,7 +77,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(KafkaArgumentsProvider.AutoDeleteSolaceConnectorDeploymentAfterEach.class)
-public class SinkConnectorIT implements TestConstants {
+class SinkConnectorIT implements TestConstants {
 
     static Logger logger = LoggerFactory.getLogger(SinkConnectorIT.class);
     static TestSolaceQueueConsumer solaceQueueConsumer;
@@ -107,7 +103,7 @@ public class SinkConnectorIT implements TestConstants {
     }
 
     @BeforeEach
-    public void beforeEach(JCSMPProperties jcsmpProperties) {
+    void beforeEach(JCSMPProperties jcsmpProperties) {
         connectorProps = new Properties();
         connectorProps.setProperty(SolaceSinkConstants.SOL_HOST, String.format("tcp://%s:55555", NetworkPubSubPlusContainerProvider.DOCKER_NET_PUBSUB_ALIAS));
         connectorProps.setProperty(SolaceSinkConstants.SOL_USERNAME, jcsmpProperties.getStringProperty(JCSMPProperties.USERNAME));
@@ -225,7 +221,7 @@ public class SinkConnectorIT implements TestConstants {
             assertEquals(metadata.topic(), userHeader.getString("k_topic"));
             assertEquals(Long.toString(metadata.partition()), userHeader.getString("k_partition"));
             assertEquals(Long.toString(metadata.offset()), userHeader.getString("k_offset"));
-            assertThat(message.getApplicationMessageType(), containsString(metadata.topic()));
+            assertThat(message.getApplicationMessageType()).contains(metadata.topic());
             // additional checks as requested
             if (additionalChecks != null) {
                 for (Map.Entry<AdditionalCheck, String> check : additionalChecks.entrySet()) {
@@ -487,9 +483,10 @@ public class SinkConnectorIT implements TestConstants {
                 .untilAsserted(() -> {
                     JsonObject status = kafkaContext.getSolaceConnectorDeployment().getConnectorStatus();
                     JsonObject taskStatus = status.getAsJsonArray("tasks").get(0).getAsJsonObject();
-                    assertThat(String.format("Connector task not in FAILED state: %s", GSON.toJson(status)),
-                        taskStatus.get("state").getAsString(), equalTo("FAILED"));
-                    assertThat(taskStatus.get("trace").getAsString(), containsString("Message VPN Not Allowed"));
+                    assertThat(taskStatus.get("state").getAsString())
+                        .as("Connector task not in FAILED state: %s", GSON.toJson(status))
+                        .isEqualTo("FAILED");
+                    assertThat(taskStatus.get("trace").getAsString()).contains("Message VPN Not Allowed");
                 });
         }
 
@@ -668,12 +665,12 @@ public class SinkConnectorIT implements TestConstants {
                 }
 
                 if (dynamicDestination) {
-                    assertThat(receivedMsgDestinations, hasSize(1));
-                    assertThat(receivedMsgDestinations, hasItems(JCSMPFactory.onlyInstance().createTopic(topicName)));
+                    assertThat(receivedMsgDestinations).containsExactly(
+                        JCSMPFactory.onlyInstance().createTopic(topicName));
                 } else {
-                    assertThat(receivedMsgDestinations, hasSize(2));
-                    assertThat(receivedMsgDestinations, hasItems(queue,
-                            JCSMPFactory.onlyInstance().createTopic(topicName)));
+                    assertThat(receivedMsgDestinations).containsExactlyInAnyOrder(
+                        queue,
+                        JCSMPFactory.onlyInstance().createTopic(topicName));
                 }
             }
         }
