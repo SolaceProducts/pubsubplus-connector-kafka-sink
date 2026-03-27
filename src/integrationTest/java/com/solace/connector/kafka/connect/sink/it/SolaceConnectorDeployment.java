@@ -1,5 +1,12 @@
 package com.solace.connector.kafka.connect.sink.it;
 
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -9,6 +16,20 @@ import com.google.gson.JsonParser;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConnector;
 import com.solace.connector.kafka.connect.sink.VersionUtil;
 import com.solace.connector.kafka.connect.sink.it.util.KafkaConnection;
+import java.io.File;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -23,26 +44,6 @@ import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SolaceConnectorDeployment implements TestConstants {
 
@@ -60,27 +61,22 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public void waitForConnectorRestIFUp() {
     Request request = new Request.Builder().url(kafkaConnection.getConnectUrl() + "/connector-plugins").build();
-    assertTimeoutPreemptively(Duration.ofMinutes(15), () -> {
-      boolean success = false;
-      do {
-        try {
-          Thread.sleep(1000L);
-          logger.info("Waiting for {} to be accessible", request.url());
+    await("connector REST interface to be up")
+        .atMost(15, MINUTES)
+        .pollInterval(1, SECONDS)
+        .ignoreExceptions()
+        .until(() -> {
           try (Response response = client.newCall(request).execute()) {
-            success = response.isSuccessful();
+            return response.isSuccessful();
           }
-        } catch (IOException | InterruptedException e) {
-          logger.error("Failed to get connector-plugins", e);
-        }
-      } while (!success);
-    });
+        });
   }
 
   public void provisionKafkaTestTopic() {
     // Create a new kafka test topic to use
     NewTopic newTopic = new NewTopic(kafkaTestTopic, 1, (short) 1); // new NewTopic(topicName, numPartitions,
                                                                     // replicationFactor)
-    List<NewTopic> newTopics = new ArrayList<NewTopic>();
+    List<NewTopic> newTopics = new ArrayList<>();
     newTopics.add(newTopic);
     adminClient.createTopics(newTopics);
   }
@@ -155,7 +151,7 @@ public class SolaceConnectorDeployment implements TestConstants {
       deleteConnector();
 
       // configure plugin: curl -X POST -H "Content-Type: application/json" -d
-      // @solace_source_properties.json http://18.218.82.209:8083/connectors
+      // @solace_sink_properties.json http://18.218.82.209:8083/connectors
       Request configrequest = new Request.Builder().url(kafkaConnection.getConnectUrl() + "/connectors")
           .post(RequestBody.create(configJson, MediaType.parse("application/json"))).build();
       try (Response configresponse = client.newCall(configrequest).execute()) {
@@ -164,20 +160,21 @@ public class SolaceConnectorDeployment implements TestConstants {
         logger.info("Connector config results: " + gson.toJson(responseBodyToJson(configresponse.body())));
       }
       // check success
-      AtomicReference<JsonObject> statusResponse = new AtomicReference<>(new JsonObject());
-      assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
-        JsonObject connectorStatus;
-        do {
-          connectorStatus = getConnectorStatus();
-          statusResponse.set(connectorStatus);
-        } while (!(expectStartFail ? "FAILED" : "RUNNING").equals(Optional.ofNullable(connectorStatus)
+      await(String.format("connector to %s", expectStartFail ? "fail" : "start"))
+          .atMost(10, SECONDS)
+          .untilAsserted(() -> {
+            JsonObject connectorStatus = getConnectorStatus();
+            String state = Optional.ofNullable(connectorStatus)
                 .map(a -> a.getAsJsonArray("tasks"))
-                .map(a -> a.size() > 0 ? a.get(0) : null)
+                .map(a -> !a.isEmpty() ? a.get(0) : null)
                 .map(JsonElement::getAsJsonObject)
                 .map(a -> a.get("state"))
                 .map(JsonElement::getAsString)
-                .orElse("")));
-      }, () -> "Timed out while waiting for connector to start: " + gson.toJson(statusResponse.get()));
+                .orElse("");
+            assertThat(state)
+                .as("Connector was not in expected state: %s", gson.toJson(connectorStatus))
+                .isEqualTo(expectStartFail ? "FAILED" : "RUNNING");
+          });
       Thread.sleep(5000); // Give some time to start
     } catch (IOException e) {
       e.printStackTrace();
@@ -189,26 +186,48 @@ public class SolaceConnectorDeployment implements TestConstants {
 
   public void deleteConnector() throws IOException {
     Request request = new Request.Builder()
-            .url(kafkaConnection.getConnectUrl() + "/connectors/solaceSinkConnector").delete().build();
+        .url(kafkaConnection.getConnectUrl() + "/connectors/solaceSinkConnector")
+        .delete()
+        .build();
     try (Response response = client.newCall(request).execute()) {
-      logger.info("Delete response: " + response);
+      logger.info("Delete response: {}", response);
     }
+
+    // Wait until connector is fully removed
+    Request statusRequest = new Request.Builder()
+        .url(kafkaConnection.getConnectUrl() + "/connectors/solaceSinkConnector")
+        .get().build();
+    await("connector to be fully deleted")
+        .atMost(30, SECONDS)
+        .pollInterval(500, TimeUnit.MILLISECONDS)
+        .ignoreExceptions()
+        .until(() -> {
+          try (Response response = client.newCall(statusRequest).execute()) {
+            // Connector is deleted when we get 404 or other error
+            return !response.isSuccessful();
+          }
+        });
+    logger.info("Connector fully deleted");
   }
 
   public JsonObject getConnectorStatus() {
     Request request = new Request.Builder()
-            .url(kafkaConnection.getConnectUrl() + "/connectors/solaceSinkConnector/status").build();
-    return assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
-      while (true) {
-        try (Response response = client.newCall(request).execute()) {
-          if (!response.isSuccessful()) {
-            continue;
+        .url(kafkaConnection.getConnectUrl() + "/connectors/solaceSinkConnector/status")
+        .build();
+    AtomicReference<JsonObject> result = new AtomicReference<>();
+    await("connector status to be available")
+        .atMost(30, SECONDS)
+        .ignoreExceptions()
+        .until(() -> {
+          try (Response response = client.newCall(request).execute()) {
+            if (response.isSuccessful()) {
+              result.set(responseBodyToJson(response.body()).getAsJsonObject());
+              return true;
+            }
+            return false;
           }
-
-          return responseBodyToJson(response.body()).getAsJsonObject();
-        }
-      }
-    });
+        });
+    return result.get();
   }
 
   private JsonElement responseBodyToJson(ResponseBody responseBody) {

@@ -1,12 +1,11 @@
 package com.solace.connector.kafka.connect.sink.it.util.testcontainers;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ConfluentKafkaControlCenterContainer extends GenericContainer<ConfluentKafkaControlCenterContainer> {
 	private static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("confluentinc/cp-enterprise-control-center");
@@ -21,8 +20,8 @@ public class ConfluentKafkaControlCenterContainer extends GenericContainer<Confl
 												KafkaContainer kafka,
 												ConfluentKafkaSchemaRegistryContainer schemaRegistry) {
 		super(dockerImageName);
-		assertThat(kafka.getNetworkAliases().size(), greaterThanOrEqualTo(2));
-		assertThat(schemaRegistry.getNetworkAliases().size(), greaterThanOrEqualTo(2));
+		assertThat(kafka.getNetworkAliases()).hasSizeGreaterThanOrEqualTo(2);
+		assertThat(schemaRegistry.getNetworkAliases()).hasSizeGreaterThanOrEqualTo(2);
 		assertEquals(kafka.getNetwork(), schemaRegistry.getNetwork());
 
 		//		withExposedPorts(9021);
