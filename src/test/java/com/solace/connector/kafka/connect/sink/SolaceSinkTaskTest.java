@@ -1,20 +1,16 @@
 package com.solace.connector.kafka.connect.sink;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.solacesystems.jcsmp.JCSMPException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
-public class SolaceSinkTaskTest {
+class SolaceSinkTaskTest {
 	private SolaceSinkTask solaceSinkTask;
 
 	@BeforeEach
@@ -28,11 +24,13 @@ public class SolaceSinkTaskTest {
 	}
 
 	@Test
-	public void testFailSessionConnect() {
+	void testFailSessionConnect() {
 		Map<String, String> props = new HashMap<>();
-		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.start(props));
-		assertThat(thrown.getMessage(), containsString("Failed to create JCSMPSession"));
-		assertThat(thrown.getCause(), instanceOf(JCSMPException.class));
-		assertThat(thrown.getCause().getMessage(), containsString("Null value was passed in for property (host)"));
+		assertThatThrownBy(() -> solaceSinkTask.start(props))
+				.isInstanceOf(ConnectException.class)
+				.hasMessageContaining("Failed to create JCSMPSession")
+				.cause()
+				.isInstanceOf(JCSMPException.class)
+				.hasMessageContaining("Null value was passed in for property (host)");
 	}
 }

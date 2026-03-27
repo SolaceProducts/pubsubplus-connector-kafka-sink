@@ -1,16 +1,15 @@
 package com.solace.connector.kafka.connect.sink;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.emptyArray;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.solacesystems.jcsmp.BytesXMLMessage;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.IntStream;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -18,9 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import com.solacesystems.jcsmp.BytesXMLMessage;
-
-public class SolaceSinkConnectorConfigTest {
+class SolaceSinkConnectorConfigTest {
 	@ParameterizedTest
 	@ValueSource(strings = {
 			SolaceSinkConstants.SOL_PASSWORD,
@@ -28,17 +25,17 @@ public class SolaceSinkConnectorConfigTest {
 			SolaceSinkConstants.SOL_SSL_PRIVATE_KEY_PASSWORD,
 			SolaceSinkConstants.SOL_SSL_TRUST_STORE_PASSWORD
 	})
-	public void testPasswordsObfuscation(String property) {
+	void testPasswordsObfuscation(String property) {
 		Map<String, String> properties = new HashMap<>();
-		properties.put(property, RandomStringUtils.randomAlphanumeric(30));
+		properties.put(property, RandomStringUtils.insecure().nextAlphanumeric(30));
 		SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(properties);
-		Password password = config.getPassword(property);
-		assertEquals(Password.HIDDEN, password.toString());
-		assertEquals(properties.get(property), password.value());
+		assertThat(config.getPassword(property)).satisfies(
+				p -> assertThat(p.toString()).isEqualTo(Password.HIDDEN),
+				p -> assertThat(p.value()).isEqualTo(properties.get(property)));
 	}
 
 	@Test
-	public void shouldReturnConfiguredSolRecordProcessorIFGivenConfigurableClass() {
+	void shouldReturnConfiguredSolRecordProcessorIFGivenConfigurableClass() {
 		// GIVEN
 		Map<String, String> configProps = new HashMap<>();
 		configProps.put("processor.config", "dummy");
@@ -56,9 +53,9 @@ public class SolaceSinkConnectorConfigTest {
 	}
 
 	@Test
-	public void testSplitTopics() {
+	void testSplitTopics() {
 		String[] topics = IntStream.range(0, 10)
-				.mapToObj(i -> RandomStringUtils.randomAlphanumeric(30))
+				.mapToObj(i -> RandomStringUtils.insecure().nextAlphanumeric(30))
 				.toArray(String[]::new);
 		SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(
 				Collections.singletonMap(SolaceSinkConstants.SOL_TOPICS, String.join(",", topics)));
@@ -67,11 +64,12 @@ public class SolaceSinkConnectorConfigTest {
 	}
 
 	@Test
-	public void testNullTopics() {
+	void testNullTopics() {
 		SolaceSinkConnectorConfig config = new SolaceSinkConnectorConfig(
 				Collections.singletonMap(SolaceSinkConstants.SOL_TOPICS, null));
-		assertNotNull(config.getTopics());
-		assertThat(config.getTopics(), emptyArray());
+		assertThat(config.getTopics())
+				.isNotNull()
+				.isEmpty();
 	}
 
 	public static class TestSolRecordProcessorIF implements SolRecordProcessorIF {

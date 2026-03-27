@@ -18,6 +18,10 @@
  */
 package com.solace.connector.kafka.connect.sink;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.solace.connector.kafka.connect.sink.recordprocessor.SolSimpleRecordProcessor;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -27,6 +31,8 @@ import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.transaction.RollbackException;
 import com.solacesystems.jcsmp.transaction.TransactedSession;
 import com.solacesystems.jcsmp.transaction.TransactionStatus;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.header.ConnectHeaders;
@@ -41,18 +47,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-public class SolaceSinkSenderTest {
+class SolaceSinkSenderTest {
 
     @Mock private SolSessionHandler mkSessionHandler;
     @Mock private JCSMPSession mkJcsmpSession;
@@ -60,7 +57,7 @@ public class SolaceSinkSenderTest {
     @Mock private SolaceSinkTask mkSolaceSinkTask;
 
     @Test
-    public void shouldAddKafkaRecordHeadersOnBytesXMLMessageWhenEnabled() throws JCSMPException {
+    void shouldAddKafkaRecordHeadersOnBytesXMLMessageWhenEnabled() throws JCSMPException {
         // GIVEN
         Mockito.when(mkSessionHandler.getSession()).thenReturn(mkJcsmpSession);
         Mockito.when(mkJcsmpSession.getMessageProducer(Mockito.any())).thenReturn(null);
@@ -115,7 +112,7 @@ public class SolaceSinkSenderTest {
 
     @ParameterizedTest(name = "[{index}] rollback={0}")
     @ValueSource(booleans = {true, false})
-    public void testCommit(boolean rollback) throws Exception {
+    void testCommit(boolean rollback) throws Exception {
         Mockito.when(mkSessionHandler.getSession()).thenReturn(mkJcsmpSession);
         Mockito.when(mkSessionHandler.getTxSession()).thenReturn(mkTransactedSession);
         Mockito.when(mkTransactedSession.getStatus()).thenReturn(TransactionStatus.ACTIVE);
@@ -144,7 +141,7 @@ public class SolaceSinkSenderTest {
     }
 
     @Test
-    public void testCommitNoMessages() throws Exception {
+    void testCommitNoMessages() throws Exception {
         Mockito.when(mkSessionHandler.getSession()).thenReturn(mkJcsmpSession);
         Mockito.when(mkSessionHandler.getTxSession()).thenReturn(mkTransactedSession);
 

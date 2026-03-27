@@ -1,5 +1,19 @@
 package com.solace.connector.kafka.connect.sink.it;
 
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -29,6 +43,16 @@ import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
 import eu.rekawek.toxiproxy.model.ToxicDirection;
 import eu.rekawek.toxiproxy.model.toxic.Latency;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.admin.ConsumerGroupListing;
 import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
@@ -54,30 +78,6 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.hasItems;
-import static org.hamcrest.Matchers.hasSize;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-import static org.junit.jupiter.api.Assertions.fail;
-
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(KafkaArgumentsProvider.AutoDeleteSolaceConnectorDeploymentAfterEach.class)
@@ -90,6 +90,7 @@ public class SinkConnectorIT implements TestConstants {
     enum AdditionalCheck { ATTACHMENTBYTEBUFFER, CORRELATIONID }
 
     private Properties connectorProps;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     ////////////////////////////////////////////////////
     // Main setup/teardown
@@ -161,9 +162,11 @@ public class SinkConnectorIT implements TestConstants {
                                                 RecordMetadata metadata,
                                                 Map<AdditionalCheck, String> additionalChecks)
             throws SDTException, InterruptedException {
-        assertTimeoutPreemptively(Duration.ofMinutes(5), () -> {
-            boolean isCommitted;
-            do {
+        await("Kafka offset to be committed")
+            .atMost(5, MINUTES)
+            .pollInterval(1, SECONDS)
+            .ignoreExceptions()
+            .until(() -> {
                 Stream<String> groupIds = kafkaContext.getAdminClient().listConsumerGroups().all().get().stream()
                         .map(ConsumerGroupListing::groupId);
 
@@ -183,15 +186,10 @@ public class SinkConnectorIT implements TestConstants {
                         .findAny()
                         .orElse(null);
 
-                isCommitted = partitionOffset != null && partitionOffset >= metadata.offset();
-
-                if (!isCommitted) {
-                    logger.info("Waiting for record {} to be committed. Partition offset: {}", metadata, partitionOffset);
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(1));
-                }
-            } while (!isCommitted);
-            logger.info("Record {} was committed", metadata);
-        });
+                logger.info("Waiting for record {} to be committed. Partition offset: {}", metadata, partitionOffset);
+                return partitionOffset != null && partitionOffset >= metadata.offset();
+            });
+        logger.info("Record {} was committed", metadata);
 
         List<BytesXMLMessage> receivedMessages = new ArrayList<>();
 
@@ -201,7 +199,7 @@ public class SinkConnectorIT implements TestConstants {
             assertNotNull(queueMessage);
             receivedMessages.add(queueMessage);
         } else {
-            assert(TestSolaceQueueConsumer.solaceReceivedQueueMessages.size() == 0);
+            assert(TestSolaceQueueConsumer.solaceReceivedQueueMessages.isEmpty());
         }
         for(String s : expectedSolaceTopics) {
             BytesXMLMessage newTopicMessage = TestSolaceTopicConsumer.solaceReceivedTopicMessages.poll(5,TimeUnit.SECONDS);
@@ -478,23 +476,21 @@ public class SinkConnectorIT implements TestConstants {
     @Nested
     @TestInstance(Lifecycle.PER_CLASS)
     class SolaceConnectorLifecycleTests {
-        private final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
         @ParameterizedTest
         @ArgumentsSource(KafkaArgumentsProvider.class)
         void testFailPubSubConnection(KafkaContext kafkaContext) {
-            connectorProps.setProperty("sol.vpn_name", randomAlphanumeric(10));
+            connectorProps.setProperty("sol.vpn_name", RandomStringUtils.insecure().nextAlphanumeric(10));
             kafkaContext.getSolaceConnectorDeployment().startConnector(connectorProps, true);
-            AtomicReference<JsonObject> connectorStatus = new AtomicReference<>(new JsonObject());
-            assertTimeoutPreemptively(Duration.ofMinutes(1), () -> {
-                JsonObject taskStatus;
-                do {
+            await("connector to fail")
+                .atMost(1, MINUTES)
+                .untilAsserted(() -> {
                     JsonObject status = kafkaContext.getSolaceConnectorDeployment().getConnectorStatus();
-                    connectorStatus.set(status);
-                    taskStatus = status.getAsJsonArray("tasks").get(0).getAsJsonObject();
-                } while (!taskStatus.get("state").getAsString().equals("FAILED"));
-                assertThat(taskStatus.get("trace").getAsString(), containsString("Message VPN Not Allowed"));
-            }, () -> "Timed out waiting for connector to fail: " + GSON.toJson(connectorStatus.get()));
+                    JsonObject taskStatus = status.getAsJsonArray("tasks").get(0).getAsJsonObject();
+                    assertThat(String.format("Connector task not in FAILED state: %s", GSON.toJson(status)),
+                        taskStatus.get("state").getAsString(), equalTo("FAILED"));
+                    assertThat(taskStatus.get("trace").getAsString(), containsString("Message VPN Not Allowed"));
+                });
         }
 
         @CartesianTest(name = "[{index}] dynamicDestination={0}, autoFlush={1}, kafka={2}")
@@ -604,13 +600,16 @@ public class SinkConnectorIT implements TestConstants {
                     null, null);
             sempV2Api.config().createMsgVpnQueueSubscription(SOL_VPN, queue.getName(),
                     new ConfigMsgVpnQueueSubscription().subscriptionTopic(topicName), null, null);
-            assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
-                while (sempV2Api.monitor().getMsgVpnQueue(SOL_VPN, queue.getName(), null).getData()
-                        .getMaxMsgSize() != 1) {
+            await("queue max message size to be updated to 1")
+                .atMost(30, SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> {
                     logger.info("Waiting for queue {} to have max message size of 1", queue.getName());
-                    Thread.sleep(100);
-                }
-            });
+                    return sempV2Api.monitor()
+                        .getMsgVpnQueue(SOL_VPN, queue.getName(), null)
+                        .getData()
+                        .getMaxMsgSize() == 1;
+                });
 
             try (TestSolaceQueueConsumer solaceConsumer1 = new TestSolaceQueueConsumer(jcsmpSession)) {
                 solaceConsumer1.setQueueName(queue.getName());

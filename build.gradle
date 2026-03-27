@@ -50,6 +50,7 @@ dependencies {
     integrationTestImplementation 'commons-io:commons-io:2.21.0'
     integrationTestImplementation 'com.squareup.okhttp3:okhttp:4.12.0'
     integrationTestImplementation "org.apache.kafka:kafka-clients:$kafkaVersion"
+    integrationTestImplementation 'org.awaitility:awaitility:4.3.0'
 
     testImplementation platform('org.apache.logging.log4j:log4j-bom:2.25.3')
     testImplementation platform('org.assertj:assertj-bom:3.27.7')

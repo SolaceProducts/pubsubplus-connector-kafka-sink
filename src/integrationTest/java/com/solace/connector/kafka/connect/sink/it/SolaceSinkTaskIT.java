@@ -1,5 +1,18 @@
 package com.solace.connector.kafka.connect.sink.it;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.either;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+
 import com.solace.connector.kafka.connect.sink.SolRecordProcessorIF;
 import com.solace.connector.kafka.connect.sink.SolSessionEventCallbackHandler;
 import com.solace.connector.kafka.connect.sink.SolaceSinkConstants;
@@ -36,6 +49,20 @@ import com.solacesystems.jcsmp.XMLMessage;
 import com.solacesystems.jcsmp.transaction.RollbackException;
 import eu.rekawek.toxiproxy.model.ToxicDirection;
 import eu.rekawek.toxiproxy.model.toxic.Latency;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -56,32 +83,6 @@ import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.either;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasItems;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(LogCaptorExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
@@ -91,7 +92,7 @@ public class SolaceSinkTaskIT {
 	private String clientProfileName;
 	private String clientUsernameName;
 
-	private static final Logger logger = LoggerFactory.getLogger(SolaceSinkTask.class);
+	private static final Logger logger = LoggerFactory.getLogger(SolaceSinkTaskIT.class);
 
 	@BeforeEach
 	void setUp(JCSMPProperties jcsmpProperties, SempV2Api sempV2Api) throws Exception {
@@ -102,14 +103,14 @@ public class SolaceSinkTaskIT {
 						.allowGuaranteedMsgSendEnabled(true)
 						.allowGuaranteedMsgReceiveEnabled(true)
 						.allowTransactedSessionsEnabled(true)
-						.clientProfileName(RandomStringUtils.randomAlphanumeric(30)), null, null)
+						.clientProfileName(RandomStringUtils.insecure().nextAlphanumeric(30)), null, null)
 				.getData()
 				.getClientProfileName();
 		logger.info("Created client profile {}", clientProfileName);
 
 		ConfigMsgVpnClientUsername clientUsername = sempV2Api.config().createMsgVpnClientUsername(msgVpnName,
 						new ConfigMsgVpnClientUsername()
-								.clientUsername(RandomStringUtils.randomAlphanumeric(30))
+								.clientUsername(RandomStringUtils.insecure().nextAlphanumeric(30))
 								.clientProfileName(clientProfileName)
 								.enabled(true), null, null)
 				.getData();
@@ -188,14 +189,14 @@ public class SolaceSinkTaskIT {
 		if (destinationType.isAssignableFrom(Queue.class)) {
 			connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
 		} else {
-			connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
+			connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.insecure().nextAlphanumeric(100));
 		}
 
 		solaceSinkTask.start(connectorProperties);
 
-		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0);
 
 		solaceSinkTask.stop();
 		ConnectException thrown = assertThrows(ConnectException.class, () -> solaceSinkTask.put(
@@ -214,12 +215,12 @@ public class SolaceSinkTaskIT {
 				.getName());
 		solaceSinkTask.start(connectorProperties);
 
-		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0);
 
 		String dynamicDestinationName = destinationType.isAssignableFrom(Queue.class) ? queue.getName() :
-				RandomStringUtils.randomAlphanumeric(100);
+				RandomStringUtils.insecure().nextAlphanumeric(100);
 		sinkRecord.headers()
 				.addString(DynamicDestinationTypeRecordProcessor.HEADER_DYNAMIC_DESTINATION, dynamicDestinationName)
 				.addString(DynamicDestinationTypeRecordProcessor.HEADER_DYNAMIC_DESTINATION_TYPE, destinationType.getName());
@@ -242,10 +243,10 @@ public class SolaceSinkTaskIT {
 		connectorProperties.put(SolaceSinkConstants.SOL_DYNAMIC_DESTINATION, Boolean.toString(true));
 		solaceSinkTask.start(connectorProperties);
 
-		Set<SinkRecord> records = Collections.singleton(new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, String.format("%s %s", RandomStringUtils.randomAlphanumeric(4),
-				RandomStringUtils.randomAlphanumeric(100)).getBytes(StandardCharsets.UTF_8), 0));
+		Set<SinkRecord> records = Collections.singleton(new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, String.format("%s %s", RandomStringUtils.insecure().nextAlphanumeric(4),
+				RandomStringUtils.insecure().nextAlphanumeric(100)).getBytes(StandardCharsets.UTF_8), 0));
 
 		if (ignoreRecordProcessorError) {
 			Future<?> future = executorService.submit(() -> {
@@ -277,9 +278,9 @@ public class SolaceSinkTaskIT {
 		connectorProperties.put(SolaceSinkConstants.SOL_RECORD_PROCESSOR_IGNORE_ERROR, Boolean.toString(ignoreRecordProcessorError));
 		solaceSinkTask.start(connectorProperties);
 
-		Set<SinkRecord> records = Collections.singleton(new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0));
+		Set<SinkRecord> records = Collections.singleton(new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0));
 
 		if (ignoreRecordProcessorError) {
 			Future<?> future = executorService.submit(() -> {
@@ -305,7 +306,7 @@ public class SolaceSinkTaskIT {
 	@ValueSource(booleans = {false, true})
 	public void testCommitRollback(boolean autoFlush, SempV2Api sempV2Api, Queue queue) throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
-		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
+		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.insecure().nextAlphanumeric(100));
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
 		if (autoFlush) {
@@ -317,19 +318,20 @@ public class SolaceSinkTaskIT {
 				.subscriptionTopic(connectorProperties.get(SolaceSinkConstants.SOL_TOPICS)), null, null);
 		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null, null);
 
-		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
-			while (sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
-					.getMaxMsgSize() != 1) {
+		await("queue max message size to be updated to 1")
+			.atMost(20, SECONDS)
+			.pollInterval(100, TimeUnit.MILLISECONDS)
+			.until(() -> {
 				logger.info("Waiting for queue {} to have max message size of 1", queue.getName());
-				Thread.sleep(100);
-			}
-		});
+				return sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
+						.getMaxMsgSize() == 1;
+			});
 
 		solaceSinkTask.start(connectorProperties);
 
-		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0);
 
 		ConnectException thrown;
 		if (autoFlush) {
@@ -369,7 +371,7 @@ public class SolaceSinkTaskIT {
 			connectorProperties.put(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(1));
 		}
 
-		String topicName = RandomStringUtils.randomAlphanumeric(100);
+		String topicName = RandomStringUtils.insecure().nextAlphanumeric(100);
 		String vpnName = connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME);
 
 		if (destinationType.isAssignableFrom(Topic.class)) {
@@ -378,19 +380,20 @@ public class SolaceSinkTaskIT {
 		}
 
 		sempV2Api.config().updateMsgVpnQueue(vpnName, queue.getName(), new ConfigMsgVpnQueue().maxMsgSize(1), null, null);
-		assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
-			while (sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
-					.getMaxMsgSize() != 1) {
+		await("queue max message size to be updated to 1")
+			.atMost(20, SECONDS)
+			.pollInterval(100, TimeUnit.MILLISECONDS)
+			.until(() -> {
 				logger.info("Waiting for queue {} to have max message size of 1", queue.getName());
-				Thread.sleep(100);
-			}
-		});
+				return sempV2Api.monitor().getMsgVpnQueue(vpnName, queue.getName(), null).getData()
+						.getMaxMsgSize() == 1;
+			});
 
 		solaceSinkTask.start(connectorProperties);
 
-		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0);
 
 		String dynamicDestinationName = destinationType.isAssignableFrom(Queue.class) ? queue.getName() : topicName;
 		sinkRecord.headers()
@@ -428,7 +431,7 @@ public class SolaceSinkTaskIT {
 			throws Exception {
 		connectorProperties.put(SolaceSinkConstants.SOL_HOST, (String) jcsmpSession.getProperty(JCSMPProperties.HOST));
 		connectorProperties.put(SolaceSinkConstants.SOl_QUEUE, queue.getName());
-		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
+		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.insecure().nextAlphanumeric(100));
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_QUEUE, Boolean.toString(true));
 		connectorProperties.put(SolaceSinkConstants.SOl_USE_TRANSACTIONS_FOR_TOPICS, Boolean.toString(true));
 		connectorProperties.put(SolaceSinkConstants.SOL_CHANNEL_PROPERTY_reconnectRetries, Integer.toString(-1));
@@ -443,9 +446,9 @@ public class SolaceSinkTaskIT {
 
 		solaceSinkTask.start(connectorProperties);
 
-		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0);
 		Map<TopicPartition, OffsetAndMetadata> currentOffsets = Collections.singletonMap(
 				new TopicPartition(sinkRecord.topic(), sinkRecord.kafkaPartition()),
 				new OffsetAndMetadata(sinkRecord.kafkaOffset()));
@@ -489,14 +492,15 @@ public class SolaceSinkTaskIT {
 		consumerFlowProperties.setStartState(true);
 		FlowReceiver flow = jcsmpSession.createFlow(null, consumerFlowProperties);
 		try {
-			assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
-				while (receivedDestinations.size() < 2) {
+			await("messages to be received")
+				.atMost(30, SECONDS)
+				.until(() -> {
 					logger.info("Receiving messages");
 					Optional.ofNullable(flow.receive())
 							.map(XMLMessage::getDestination)
 							.ifPresent(receivedDestinations::add);
-				}
-			});
+					return receivedDestinations.size() >= 2;
+				});
 		} finally {
 			flow.close();
 		}
@@ -525,13 +529,13 @@ public class SolaceSinkTaskIT {
 				.getName());
 
 		// Force transacted session to be created during connector-start.
-		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.randomAlphanumeric(100));
+		connectorProperties.put(SolaceSinkConstants.SOL_TOPICS, RandomStringUtils.insecure().nextAlphanumeric(100));
 
 		if (autoFlush) {
 			connectorProperties.put(SolaceSinkConstants.SOL_AUTOFLUSH_SIZE, Integer.toString(1));
 		}
 
-		String topicName = RandomStringUtils.randomAlphanumeric(100);
+		String topicName = RandomStringUtils.insecure().nextAlphanumeric(100);
 		if (destinationType.isAssignableFrom(Topic.class)) {
 			sempV2Api.config().createMsgVpnQueueSubscription(connectorProperties.get(SolaceSinkConstants.SOL_VPN_NAME),
 					queue.getName(), new ConfigMsgVpnQueueSubscription()
@@ -540,9 +544,9 @@ public class SolaceSinkTaskIT {
 
 		solaceSinkTask.start(connectorProperties);
 
-		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.randomAlphanumeric(100), 0,
-				Schema.STRING_SCHEMA, RandomStringUtils.randomAlphanumeric(100),
-				Schema.BYTES_SCHEMA, RandomUtils.nextBytes(10), 0);
+		SinkRecord sinkRecord = new SinkRecord(RandomStringUtils.insecure().nextAlphanumeric(100), 0,
+				Schema.STRING_SCHEMA, RandomStringUtils.insecure().nextAlphanumeric(100),
+				Schema.BYTES_SCHEMA, RandomUtils.insecure().randomBytes(10), 0);
 
 		String dynamicDestinationName = destinationType.isAssignableFrom(Queue.class) ? queue.getName() : topicName;
 		sinkRecord.headers()
@@ -591,17 +595,10 @@ public class SolaceSinkTaskIT {
 		consumerFlowProperties.setStartState(true);
 		FlowReceiver flow = jcsmpSession.createFlow(null, consumerFlowProperties);
 		try {
-			assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
-				while (true) {
-					logger.info("Receiving message");
-					BytesXMLMessage receivedMessage = flow.receive();
-					if (receivedMessage != null) {
-						assertInstanceOf(destinationType, receivedMessage.getDestination());
-						assertEquals(dynamicDestinationName, receivedMessage.getDestination().getName());
-						break;
-					}
-				}
-			});
+				logger.info("Receiving message");
+				BytesXMLMessage receivedMessage = flow.receive(30000);
+				assertInstanceOf(destinationType, receivedMessage.getDestination());
+				assertEquals(dynamicDestinationName, receivedMessage.getDestination().getName());
 		} finally {
 			flow.close();
 		}
